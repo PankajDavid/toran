@@ -3,7 +3,10 @@ import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildPlan, PlanInputError, todayInIndia } from "./engine/index.js";
+import { buildPlan, parsePlanInput, PlanInputError, todayInIndia } from "./engine/index.js";
+import { aiClientFromEnv, type AiClient } from "./ai/client.js";
+import { generateIdeas, IdeasRequestSchema } from "./ai/ideas.js";
+import { runInterviewTurn, TurnSchema } from "./interview/interview.js";
 
 const OVERRIDE_HEADERS = ["x-http-method-override", "x-http-method", "x-method-override", "x-original-url", "x-rewrite-url"];
 
@@ -17,10 +20,14 @@ export interface AppOptions {
   /** Injected for tests; production uses today's date in India. */
   today?: () => string;
   planRateLimitPerMinute?: number;
+  aiRateLimitPerMinute?: number;
+  /** Injected for tests; production builds one from GEMINI_API_KEY (offline if absent). */
+  ai?: AiClient;
 }
 
 export function createApp(opts: AppOptions = {}) {
   const today = opts.today ?? (() => todayInIndia());
+  const ai = opts.ai ?? aiClientFromEnv();
   const app = express();
 
   app.use(stripOverrideHeaders);
@@ -57,7 +64,46 @@ export function createApp(opts: AppOptions = {}) {
   app.use(express.static(path.join(__dirname, "..", "public"), { index: "index.html", maxAge: "1h" }));
 
   app.get("/health", (_req, res) => {
-    res.json({ status: "ok" });
+    // Reports whether AI is configured, never the key itself.
+    res.json({ status: "ok", ai: ai.available ? "configured" : "offline" });
+  });
+
+  // Every endpoint that can trigger an AI call gets this stricter limit, so
+  // nobody can run up the AI bill.
+  const aiLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: opts.aiRateLimitPerMinute ?? 20,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: { error: "Too many requests. Please wait a minute and try again." },
+  });
+
+  app.post("/api/interview", aiLimiter, async (req, res) => {
+    const turn = TurnSchema.safeParse(req.body);
+    if (!turn.success) {
+      res.status(400).json({ error: "Please check your answer." });
+      return;
+    }
+    res.json(await runInterviewTurn(turn.data, today(), ai));
+  });
+
+  app.post("/api/ideas", aiLimiter, async (req, res) => {
+    const body = IdeasRequestSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({ error: "Please check your inputs." });
+      return;
+    }
+    try {
+      const plan = parsePlanInput(body.data.plan, today());
+      const { theme, notes, refine } = body.data;
+      res.json(await generateIdeas(plan, { theme, notes, refine }, ai));
+    } catch (err) {
+      if (err instanceof PlanInputError) {
+        res.status(400).json({ error: "Please check your inputs.", issues: err.issues });
+        return;
+      }
+      throw err;
+    }
   });
 
   const planLimiter = rateLimit({

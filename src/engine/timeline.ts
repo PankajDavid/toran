@@ -63,6 +63,15 @@ const TEMPLATES: Record<EventType, TaskTemplate[]> = {
     { id: "b-headcount", title: "Give final headcount for food", leadDays: 3 },
     { id: "b-day", title: "Day-before checklist: candles, lighter, plates, music", leadDays: 1 },
   ],
+  party: [
+    { id: "p-venue", title: "Book the venue or confirm hosting at home", leadDays: 21 },
+    { id: "p-invites", title: "Send invitations", leadDays: 14 },
+    { id: "p-theme", title: "Decide theme and dress code", leadDays: 10 },
+    { id: "p-games", title: "Plan games and buy prizes", leadDays: 7, onlyFor: ["kitty"] },
+    { id: "p-cake", title: "Order cake", leadDays: 7, onlyFor: ["anniversary"] },
+    { id: "p-food", title: "Confirm menu and headcount", leadDays: 4 },
+    { id: "p-day", title: "Day-before checklist: seating, music, serving, gifts", leadDays: 1 },
+  ],
   community: [
     { id: "c-permits", title: "Get permissions (RWA / police / municipal) as needed", leadDays: 45 },
     { id: "c-venue", title: "Book ground / tent and seating", leadDays: 40 },

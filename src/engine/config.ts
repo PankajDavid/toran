@@ -9,13 +9,22 @@
  * Using whole numbers avoids floating-point drift.
  */
 
-export const EVENT_TYPES = ["wedding", "birthday", "community"] as const;
+export const EVENT_TYPES = ["wedding", "birthday", "party", "community"] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
 export const WEDDING_STYLES = ["punjabi", "south-indian", "bengali", "christian", "other"] as const;
 export const WEDDING_SUB_EVENTS = ["haldi", "mehendi", "sangeet", "ceremony", "reception"] as const;
 export const BIRTHDAY_KINDS = ["kid", "adult", "milestone"] as const;
+/** Smaller social gatherings. A kitty party is planned as one gathering for the host. */
+export const PARTY_KINDS = ["kitty", "anniversary", "other"] as const;
 export const COMMUNITY_KINDS = ["jagran", "langar", "diwali-mela", "rwa-function", "other"] as const;
+
+export const SUB_TYPES: Record<EventType, readonly string[]> = {
+  wedding: WEDDING_STYLES,
+  birthday: BIRTHDAY_KINDS,
+  party: PARTY_KINDS,
+  community: COMMUNITY_KINDS,
+};
 
 export type WeddingSubEvent = (typeof WEDDING_SUB_EVENTS)[number];
 export type CityTier = 1 | 2 | 3;
@@ -77,6 +86,32 @@ export const ALLOCATIONS: Record<string, CategoryShare[]> = {
     { key: "invites-gifts", label: "Invitations", bp: 100 },
     { key: "contingency", label: "Contingency buffer", bp: 500 },
   ],
+  "party:kitty": [
+    { key: "venue", label: "Venue (home, café or hall)", bp: 2000 },
+    { key: "catering", label: "Food & drinks", bp: 4500, food: true },
+    { key: "decor", label: "Decor & theme", bp: 1000 },
+    { key: "games-prizes", label: "Games & prizes", bp: 1500 },
+    { key: "return-gifts", label: "Return gifts", bp: 500 },
+    { key: "contingency", label: "Contingency buffer", bp: 500 },
+  ],
+  "party:anniversary": [
+    { key: "venue", label: "Venue", bp: 2500 },
+    { key: "catering", label: "Food & drinks", bp: 3500, food: true },
+    { key: "decor", label: "Decor", bp: 1500 },
+    { key: "cake", label: "Cake", bp: 500 },
+    { key: "entertainment", label: "Music & entertainment", bp: 800 },
+    { key: "photo-video", label: "Photography", bp: 700 },
+    { key: "contingency", label: "Contingency buffer", bp: 500 },
+  ],
+  "party:other": [
+    { key: "venue", label: "Venue", bp: 2500 },
+    { key: "catering", label: "Food & drinks", bp: 3500, food: true },
+    { key: "decor", label: "Decor", bp: 1500 },
+    { key: "entertainment", label: "Music & entertainment", bp: 1000 },
+    { key: "photo-video", label: "Photography", bp: 500 },
+    { key: "invites-gifts", label: "Invitations & gifts", bp: 500 },
+    { key: "contingency", label: "Contingency buffer", bp: 500 },
+  ],
   "community:jagran": [
     { key: "venue", label: "Tent & seating", bp: 2500 },
     { key: "sound-lighting", label: "Sound & lighting", bp: 1500 },
@@ -132,6 +167,7 @@ export const ALLOCATIONS: Record<string, CategoryShare[]> = {
 export const FOOD_FLOOR_PER_GUEST: Record<string, Record<CityTier, number>> = {
   wedding: { 1: 900, 2: 700, 3: 500 },
   birthday: { 1: 500, 2: 400, 3: 300 },
+  party: { 1: 500, 2: 400, 3: 300 },
   "community:langar": { 1: 80, 2: 60, 3: 50 },
   community: { 1: 150, 2: 120, 3: 100 },
 };

@@ -1,8 +1,23 @@
 import { z } from "zod";
-import { BIRTHDAY_KINDS, COMMUNITY_KINDS, LIMITS, WEDDING_STYLES, WEDDING_SUB_EVENTS } from "./config.js";
+import { BIRTHDAY_KINDS, COMMUNITY_KINDS, LIMITS, PARTY_KINDS, WEDDING_STYLES, WEDDING_SUB_EVENTS } from "./config.js";
 import { addYears, isValidIsoDate } from "./dates.js";
 
+export const DIETS = ["veg", "jain", "non-veg", "mixed"] as const;
+
+/** Optional details used for ideas and vendor search; never for calculations. */
+const optionalDetails = {
+  city: z
+    .string()
+    .trim()
+    .min(2)
+    .max(60)
+    .regex(/^[\p{L}\p{M} .'-]+$/u, "City name can only contain letters, spaces, dots and hyphens")
+    .optional(),
+  diet: z.enum(DIETS).optional(),
+};
+
 const common = {
+  ...optionalDetails,
   totalBudgetINR: z
     .number({ error: "Budget must be a number" })
     .int("Budget must be in whole rupees")
@@ -27,9 +42,10 @@ const inputSchema = z.discriminatedUnion(
       ...common,
     }),
     z.strictObject({ eventType: z.literal("birthday"), subType: z.enum(BIRTHDAY_KINDS), ...common }),
+    z.strictObject({ eventType: z.literal("party"), subType: z.enum(PARTY_KINDS), ...common }),
     z.strictObject({ eventType: z.literal("community"), subType: z.enum(COMMUNITY_KINDS), ...common }),
   ],
-  { error: "Event type must be wedding, birthday or community" },
+  { error: "Event type must be wedding, birthday, party or community" },
 );
 
 export type PlanInput = z.infer<typeof inputSchema>;

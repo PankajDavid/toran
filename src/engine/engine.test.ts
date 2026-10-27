@@ -3,6 +3,7 @@ import {
   ALLOCATIONS,
   BIRTHDAY_KINDS,
   COMMUNITY_KINDS,
+  PARTY_KINDS,
   WEDDING_STYLES,
   addYears,
   allocateBudget,
@@ -22,6 +23,7 @@ const TODAY = "2026-10-27";
 const ALL_COMBOS: [EventType, string][] = [
   ...WEDDING_STYLES.map((s) => ["wedding", s] as [EventType, string]),
   ...BIRTHDAY_KINDS.map((s) => ["birthday", s] as [EventType, string]),
+  ...PARTY_KINDS.map((s) => ["party", s] as [EventType, string]),
   ...COMMUNITY_KINDS.map((s) => ["community", s] as [EventType, string]),
 ];
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);

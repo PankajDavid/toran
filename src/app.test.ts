@@ -2,12 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { createApp } from "./app.js";
+import { offlineClient } from "./ai/client.js";
 
 let server: Server;
 let base: string;
 
 beforeAll(async () => {
-  server = createApp({ today: () => "2026-10-27", planRateLimitPerMinute: 5 }).listen(0);
+  server = createApp({ today: () => "2026-10-27", planRateLimitPerMinute: 5, aiRateLimitPerMinute: 6, ai: offlineClient }).listen(0);
   await new Promise((r) => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -21,7 +22,36 @@ describe("HTTP API", () => {
   it("health check works", async () => {
     const res = await fetch(`${base}/health`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: "ok" });
+    expect(await res.json()).toEqual({ status: "ok", ai: "offline" });
+  });
+
+  it("interview works end to end without AI: one Hinglish sentence plus button taps", async () => {
+    const turn = (body: unknown) =>
+      fetch(`${base}/api/interview`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+    let r = await turn({ text: "Beti ki shaadi hai 14 Feb ko, Ludhiana mein, 300 log, 15 lakh budget" });
+    expect(r.known).toMatchObject({ eventType: "wedding", eventDate: "2027-02-14", guestCount: 300, totalBudgetINR: 1_500_000, city: "Ludhiana", cityTier: 2, subType: "punjabi" });
+    expect(r.guessed).toContain("subType");
+    expect(r.next.field).toBe("subEvents");
+    r = await turn({ known: r.known, guessed: r.guessed, set: { subEvents: ["mehendi", "ceremony"] } });
+    expect(r.next).toBeNull();
+    const plan = await post(r.planInput).then((x) => x.json());
+    expect(plan.budget.totalINR).toBe(1_500_000);
+  });
+
+  it("ideas fall back to the offline set when AI is unavailable", async () => {
+    const res = await fetch(`${base}/api/ideas`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ plan: { ...valid, diet: "jain" } }),
+    });
+    const body = await res.json();
+    expect(body.source).toBe("offline");
+    expect(JSON.stringify(body.ideas.menu)).not.toMatch(/onion|garlic|potato|chicken/i);
+  });
+
+  it("rejects malformed interview turns", async () => {
+    const res = await fetch(`${base}/api/interview`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: "x".repeat(600) }) });
+    expect(res.status).toBe(400);
   });
 
   it("returns a plan for valid input", async () => {

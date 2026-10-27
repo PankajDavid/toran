@@ -39,6 +39,13 @@ const TEMPLATES: Record<EventType, VendorTemplate[]> = {
     { key: "entertainment", category: "Entertainer / games", questions: ["What age group is the act designed for?", "How long is the show, and what space do you need?", "Do you bring your own sound system?", COMMON_PAYMENT_Q] },
     { key: "decor", category: "Decorator", questions: ["Can you show photos of this theme?", "How long does setup take?", "Are balloons and props reused or new?"] },
   ],
+  party: [
+    { key: "venue", category: "Venue (café, restaurant or hall)", questions: ["Is there a private section for our group size?", "Is there a minimum spend or per-head package?", "Can we bring our own decor and music?", COMMON_PAYMENT_Q] },
+    { key: "catering", category: "Food", questions: ["Is there a fixed menu or can we choose dishes?", "Are taxes and service charge included in the quote?", "What is the minimum order?"] },
+    { key: "games-host", category: "Games host / anchor", onlyFor: ["kitty"], questions: ["Which games do you run, and for how long?", "Do you bring props and prizes, or do we?", COMMON_PAYMENT_Q] },
+    { key: "cake", category: "Cake", onlyFor: ["anniversary"], questions: ["Is eggless available?", "How many servings does this size give?", "When and how will it be delivered?"] },
+    { key: "decor", category: "Decorator", questions: ["Can you show photos of this theme?", "How long does setup take?", "Is cleanup included?"] },
+  ],
   community: [
     { key: "venue", category: "Tent house", questions: ["What is included: shamiana, chairs, carpets, lights?", "Who handles setup and teardown, and when?", "Is fire-retardant fabric used?", COMMON_PAYMENT_Q] },
     { key: "sound-lighting", category: "Sound & lighting", questions: ["What is the speaker wattage for our crowd size?", "Is a generator or power backup included?", "Will an operator stay for the whole event?", COMMON_PAYMENT_Q] },
