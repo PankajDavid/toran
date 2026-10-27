@@ -1,5 +1,5 @@
 {
-  "name": "bandobast",
+  "name": "toran",
   "version": "1.0.0",
   "description": "GenAI event planning assistant for Indian weddings, birthdays and community events",
   "main": "dist/server.js",

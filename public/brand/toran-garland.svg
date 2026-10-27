@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 110" role="img" aria-label="Toran garland with marigold medallion">
+<path d="M4 6 L10 10 Q210 60 410 10 L416 6" fill="none" stroke="#B3203A" stroke-width="3" stroke-linecap="round"/>
+<g fill="#2F7D4A">
+<path d="M50 19 C43 26 45 36 50 41 C55 36 57 26 50 19Z"/>
+<path d="M130 31 C123 38 125 48 130 53 C135 48 137 38 130 31Z"/>
+<path d="M290 31 C283 38 285 48 290 53 C295 48 297 38 290 31Z"/>
+<path d="M370 19 C363 26 365 36 370 41 C375 36 377 26 370 19Z"/>
+</g>
+<g fill="#F4A300"><circle cx="90" cy="34" r="8.5"/><circle cx="170" cy="42" r="8.5"/><circle cx="250" cy="42" r="8.5"/><circle cx="330" cy="34" r="8.5"/></g>
+<g fill="#E07B00"><circle cx="90" cy="34" r="3.2"/><circle cx="170" cy="42" r="3.2"/><circle cx="250" cy="42" r="3.2"/><circle cx="330" cy="34" r="3.2"/></g>
+<path d="M210 35 V50" stroke="#B3203A" stroke-width="2.5"/>
+<g fill="#F4A300">
+<circle cx="230" cy="74" r="9"/><circle cx="227.3" cy="84" r="9"/><circle cx="220" cy="91.3" r="9"/><circle cx="210" cy="94" r="9"/>
+<circle cx="200" cy="91.3" r="9"/><circle cx="192.7" cy="84" r="9"/><circle cx="190" cy="74" r="9"/><circle cx="192.7" cy="64" r="9"/>
+<circle cx="200" cy="56.7" r="9"/><circle cx="210" cy="54" r="9"/><circle cx="220" cy="56.7" r="9"/><circle cx="227.3" cy="64" r="9"/>
+<circle cx="210" cy="74" r="21"/>
+</g>
+<circle cx="210" cy="74" r="14.5" fill="#E07B00"/>
+<path d="M202.8 74.5 L208.2 79.9 L218.1 68.6" fill="none" stroke="#FFF6E6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

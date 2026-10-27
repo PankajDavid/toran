@@ -1,4 +1,4 @@
-# Bandobast
+# Toran
 
 A GenAI planning assistant for Indian weddings, birthdays and community events — budgets, timelines, vendor checklists and personalised ideas.
 
@@ -8,7 +8,7 @@ Built for **PromptWars Virtual** (Google × Hack2Skill), using Claude Code as th
 
 Most AI planners ask a language model to write the budget. Language models are bad at arithmetic, so the totals often don't add up.
 
-Bandobast splits the work:
+Toran splits the work:
 
 | Part | Who does it | Why |
 |---|---|---|

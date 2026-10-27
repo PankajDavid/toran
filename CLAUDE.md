@@ -1,9 +1,19 @@
-# Bandobast — project rules for AI coding agents
+# Toran — project rules for AI coding agents
 
 GenAI planning assistant for Indian weddings, birthdays, kitty parties and community events.
 Pitch: "Every number is calculated by code, traced to a source, or read from a quote in your hand."
 Built for PromptWars Virtual Challenge 5 (Google x Hack2Skill). Final deadline: 1 Nov 2026, 11:59 PM IST.
 Concept doc: https://claude.ai/artifact/KSkuKFyLLpA5ofmtNtTP99
+
+## Brand
+- Name: Toran (the festive door garland). Tagline: "every celebration, sorted."
+- Logo 5A: "Toran" in Rozha One, kumkum red, under a garland of mango leaves and marigolds
+  with a marigold medallion holding a tick at the centre. Files: `public/brand/`, `public/favicon.svg`.
+  Concepts: https://claude.ai/artifact/EnRQCrr8KmMji533ZEZgnU
+- Colours: kumkum #B3203A, marigold #F4A300, marigold deep #E07B00, leaf #2F7D4A,
+  cream ground #FFF6E6, ink #2B1B10, muted text #6B4A2E. Fonts: Rozha One (display), Baloo 2 (UI).
+- "Plan ready" animation (and demo video opener): a tick appears on each marigold of the
+  garland in turn, then a final big tick lands in the "o" of Toran (concept 5B style).
 
 ## CORE ARCHITECTURE RULE (non-negotiable)
 - Every calculated number and date comes from deterministic TypeScript in `src/engine/`.
