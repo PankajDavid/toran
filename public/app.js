@@ -420,9 +420,8 @@
       if (l.booked) {
         const diff = l.differenceINR;
         note = el("span", { class: "line-note" },
-          `Booked · planned ${inr(l.plannedINR)}` +
-          (diff ? ` · ${diff > 0 ? "over by " + inr(diff) : "saved " + inr(-diff)}` : "") +
-          ` · advance ${inr(l.advanceINR)} · due ${inr(l.dueINR)}`);
+          el("span", null, `Planned ${inr(l.plannedINR)}${diff ? ` · ${diff > 0 ? "over by " + inr(diff) : "saved " + inr(-diff)}` : ""}`),
+          el("span", null, `Advance ${inr(l.advanceINR)} · due ${inr(l.dueINR)}`));
       } else if (isBuffer && sp.bookedCount && sp.contingencyNowINR !== l.plannedINR) {
         note = el("span", { class: "line-note" }, `Planned ${inr(l.plannedINR)} · adjusted for your bookings`);
       }
@@ -430,11 +429,12 @@
       return el("tr", { class: l.booked ? "booked" : "" },
         el("th", { scope: "row" }, l.label, l.booked ? el("span", { class: "badge booked" }, "booked") : null, note, bar),
         el("td", { class: "num" }, inr(amount)),
-        el("td", { class: "num" }, pct(bpByKey[l.key])));
+        el("td", { class: "num share" }, pct(bpByKey[l.key])));
     }));
     // Total = what the lines above add up to. When bookings push past the budget, say both.
     const projected = sp.projectedSpendINR;
-    $("budget-total").textContent = sp.overBudgetINR ? `${inr(projected)} (budget ${inr(p.budget.totalINR)})` : inr(projected);
+    $("budget-total").replaceChildren(inr(projected),
+      sp.overBudgetINR ? el("span", { class: "line-note over-note" }, `Budget ${inr(p.budget.totalINR)}`) : "");
 
     // Timeline
     const doneCount = p.timeline.tasks.filter((t) => state.done[t.id]).length;
@@ -476,6 +476,7 @@
       el("details", { class: "vendor" }, el("summary", null, v.category), el("ul", null, v.questions.map((q) => el("li", null, q))))));
 
     renderIdeas();
+    updateInstall();
   }
 
   /* ---------- ideas ---------- */
@@ -498,7 +499,13 @@
       box.append(el("div", { class: "ideas-block" }, el("h3", null, "Menu"),
         i.menu.map((c) => el("div", null, el("strong", null, c.course), el("ul", null, c.items.map((x) => el("li", null, x)))))));
     }
-    if (i.invitation) box.append(el("div", { class: "ideas-block" }, el("h3", null, "Invitation wording"), el("p", { class: "invitation" }, i.invitation)));
+    if (i.invitation) {
+      box.append(el("div", { class: "ideas-block" }, el("h3", null, "Invitation wording"),
+        el("p", { class: "invitation" }, i.invitation),
+        el("div", { class: "row-actions" },
+          el("a", { class: "btn-primary btn-link", href: whatsappUrl(i.invitation), target: "_blank", rel: "noopener" }, "Send on WhatsApp"),
+          el("button", { type: "button", class: "btn-quiet", onclick: (e) => copyText(i.invitation, e.currentTarget) }, "Copy"))));
+    }
     if (i.tips.length) box.append(el("div", { class: "ideas-block" }, el("h3", null, "Tips"), el("ul", null, i.tips.map((t) => el("li", null, t)))));
     const notes = [];
     if (r.source === "offline") notes.push("These come from our curated set because the AI is offline right now.");
@@ -530,6 +537,143 @@
     if (t) loadIdeas(t);
   });
 
+  /* ---------- sharing ---------- */
+  const whatsappUrl = (text) => "https://wa.me/?text=" + encodeURIComponent(text);
+
+  async function copyText(text, button) {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (button) { const old = button.textContent; button.textContent = "Copied"; setTimeout(() => { button.textContent = old; }, 1500); }
+    } catch {
+      window.prompt("Copy this:", text);
+    }
+  }
+
+  // The plan link carries the plan inside the part after "#", which browsers
+  // never send to a server. Opening it rebuilds the plan with the calculator.
+  function b64urlEncode(str) {
+    const bytes = new TextEncoder().encode(str);
+    let bin = "";
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64urlDecode(s) {
+    const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
+    return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+  }
+  function planLink() {
+    const payload = {
+      v: 1,
+      i: state.planInput,
+      d: state.deals || {},
+      t: Object.keys(state.done || {}).filter((k) => state.done[k]),
+    };
+    return `${location.origin}/#p=${b64urlEncode(JSON.stringify(payload))}`;
+  }
+
+  function planSummary() {
+    const p = state.plan;
+    const k = p.input;
+    const sp = p.spending;
+    const typeLabel = k.eventType === "wedding" ? `${subTypeLabel(k)} wedding` : subTypeLabel(k);
+    const next = p.timeline.tasks.filter((t) => !state.done[t.id]).slice(0, 3)
+      .map((t) => `• ${t.title} (${t.status === "late" ? "overdue" : "by " + fmtDate(t.dueDate)})`);
+    const lines = [
+      `*${typeLabel}* · ${fmtDate(k.eventDate)}${k.city ? " · " + k.city : ""}`,
+      `${k.guestCount.toLocaleString("en-IN")} guests · Budget ${inr(k.totalBudgetINR)}`,
+    ];
+    if (sp.bookedCount) lines.push(`Booked so far: ${inr(sp.agreedINR)} (advance paid ${inr(sp.advanceINR)})${sp.overBudgetINR ? ` · over budget by ${inr(sp.overBudgetINR)}` : ""}`);
+    if (next.length) lines.push("", "*Next up*", ...next);
+    lines.push("", "Full plan: " + planLink(), "", "Made with Toran · every celebration, sorted.");
+    return lines.join("\n");
+  }
+
+  $("share-wa").addEventListener("click", () => {
+    window.open(whatsappUrl(planSummary()), "_blank", "noopener");
+  });
+  $("copy-link").addEventListener("click", (e) => copyText(planLink(), e.currentTarget));
+  $("save-pdf").addEventListener("click", () => window.print());
+  // Closed sections don't print, so open them for the PDF and restore afterwards.
+  let reopened = [];
+  window.addEventListener("beforeprint", () => {
+    reopened = [...document.querySelectorAll("details:not([open])")];
+    reopened.forEach((d) => { d.open = true; });
+  });
+  window.addEventListener("afterprint", () => { reopened.forEach((d) => { d.open = false; }); reopened = []; });
+
+  /** Opens a plan from a shared link (#p=...). */
+  async function importFromLink() {
+    const m = /^#p=([A-Za-z0-9_-]{10,6000})$/.exec(location.hash);
+    if (!m) return false;
+    history.replaceState(null, "", location.pathname); // keep the plan out of the address bar afterwards
+    let payload;
+    try { payload = JSON.parse(b64urlDecode(m[1])); } catch { return false; }
+    if (!payload || payload.v !== 1 || !payload.i || typeof payload.i !== "object") return false;
+    if (state.plan && JSON.stringify(state.planInput) !== JSON.stringify(payload.i)) {
+      if (!confirm("Open the shared plan? It will replace the plan saved on this phone.")) return false;
+    }
+    const deals = {};
+    if (payload.d && typeof payload.d === "object") {
+      for (const [id, d] of Object.entries(payload.d)) {
+        if (d && Number.isInteger(d.agreedINR) && Number.isInteger(d.advanceINR)) deals[id] = { agreedINR: d.agreedINR, advanceINR: d.advanceINR };
+      }
+    }
+    try {
+      // The server re-validates everything; a tampered link just fails.
+      const plan = await api("/api/plan", { ...payload.i, deals: Object.entries(deals).map(([taskId, d]) => ({ taskId, ...d })) });
+      state = { ...fresh(), known: { ...payload.i }, planInput: payload.i, plan, deals,
+        done: Object.fromEntries((Array.isArray(payload.t) ? payload.t : []).filter((x) => typeof x === "string").map((x) => [x, true])) };
+      save();
+      renderKnown();
+      renderPlan();
+      show("plan");
+      return true;
+    } catch {
+      alert("This plan link is damaged or out of date, so it couldn't be opened.");
+      return false;
+    }
+  }
+
+  /* ---------- install / keep data safe ---------- */
+  let installEvent = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    installEvent = e;
+    $("install-btn").hidden = false;
+    updateInstall();
+  });
+  const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  function updateInstall() {
+    let dismissed = false;
+    try { dismissed = localStorage.getItem("toran.installDismissed") === "1"; } catch { /* ignore */ }
+    const show = !!state.plan && !isStandalone() && !dismissed;
+    $("install").hidden = !show;
+    if (!show) return;
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (!installEvent) {
+      $("install-text").textContent = ios
+        ? "Your plan is saved on this phone. To keep it one tap away, tap the Share button in Safari, then \"Add to Home Screen\"."
+        : "Your plan is saved on this phone. To keep it one tap away, open your browser menu (⋮) and choose \"Add to Home screen\" or \"Install app\".";
+    }
+  }
+  $("install-btn").addEventListener("click", async () => {
+    if (!installEvent) return;
+    installEvent.prompt();
+    await installEvent.userChoice.catch(() => null);
+    installEvent = null;
+    $("install-btn").hidden = true;
+    updateInstall();
+  });
+  $("install-dismiss").addEventListener("click", () => {
+    try { localStorage.setItem("toran.installDismissed", "1"); } catch { /* ignore */ }
+    $("install").hidden = true;
+  });
+  // Ask the browser not to clear our storage under pressure (granted automatically for installed apps).
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+  }
+
   /* ---------- top-level buttons ---------- */
   $("start").addEventListener("click", () => {
     show("interview");
@@ -554,6 +698,10 @@
   renderKnown();
   if (!state.deals) state.deals = {};
   if (state.plan && !state.plan.spending) { state.plan = null; } // plan saved by an older version
-  if (state.plan) { renderPlan(); show("plan"); }
-  else if (state.chat.length) { show("interview"); turn({}); }
+  function restore() {
+    if (state.plan) { renderPlan(); show("plan"); }
+    else if (state.chat.length) { show("interview"); turn({}); }
+  }
+  if (/^#p=/.test(location.hash)) importFromLink().then((opened) => { if (!opened) restore(); });
+  else restore();
 })();

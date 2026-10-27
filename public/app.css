@@ -154,7 +154,10 @@ details.vendor ul { margin: 6px 0 4px; padding-left: 20px; }
 .spend-summary .k { display: block; font-size: 13px; color: var(--muted); }
 .spend-summary strong { font-variant-numeric: tabular-nums; }
 .spend-summary .over { background: #FBE3E7; color: var(--late); }
-.line-note { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+.line-note { display: block; font-size: 13px; font-weight: 400; color: var(--muted); white-space: normal; }
+.line-note > span { display: block; }
+.over-note { color: var(--late); }
+.budget th[scope="row"] { overflow-wrap: anywhere; }
 .badge.booked { background: #E3F1E7; color: var(--leaf); }
 tr.booked th { color: var(--leaf); }
 .booking { flex-basis: 100%; margin: 6px 0 4px 32px; padding: 12px; background: var(--cream); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; gap: 4px; }
@@ -164,6 +167,7 @@ tr.booked th { color: var(--leaf); }
 .booking-msg { margin: 0; color: var(--late); font-size: 14px; min-height: 1em; }
 .booking-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .task { flex-wrap: wrap; }
+@media (max-width: 520px) { .budget .share { display: none; } .card { padding: 14px; } }
 @media (max-width: 760px) { .spend-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .booking { margin-left: 0; } }
 
 /* Plan-ready animation */
@@ -192,4 +196,38 @@ tr.booked th { color: var(--leaf); }
   .grid { grid-template-columns: minmax(0, 1fr); }
   body { font-size: 16px; }
   .msg { max-width: 94%; }
+}
+
+/* Sharing and install */
+.plan-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.share-note { margin: 8px 0 0; font-size: 13px; color: var(--muted); max-width: 40rem; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.btn-link { display: inline-flex; align-items: center; text-decoration: none; }
+.btn-link:hover { color: #fff; }
+.install {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--paper); border: 1.5px solid var(--marigold); border-radius: var(--radius);
+  padding: 14px 16px; margin-bottom: 16px;
+}
+.install h2 { margin: 0; font-size: 18px; }
+.install p { margin: 2px 0 0; color: var(--muted); font-size: 15px; max-width: 40rem; }
+.install-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Print / Save as PDF: a clean, single-column plan */
+@media print {
+  @page { margin: 14mm; }
+  body { background: #fff; font-size: 12pt; }
+  .topbar, .skip, .plan-actions, .share-note, .install, #get-ideas, .refine, .booking, .row-actions,
+  #welcome, #interview, .ready, .task > input[type="checkbox"] { display: none !important; }
+  main { max-width: none; padding: 0; }
+  .grid { display: block; }
+  .card { border: 1px solid #ccc; break-inside: avoid-page; margin-bottom: 12px; padding: 12px; }
+  .tasks { max-height: none; overflow: visible; }
+  .task { break-inside: avoid; }
+  .task.done label { text-decoration: none; }
+  .task.done label::before { content: "✓ "; color: var(--leaf); font-weight: 700; }
+  .warning { border-color: #999; background: #fff; }
+  .bar { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .plan-title { color: #B3203A; }
+  a { color: inherit; text-decoration: none; }
 }

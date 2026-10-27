@@ -6,6 +6,11 @@
   <title>Toran · every celebration, sorted</title>
   <meta name="description" content="Toran plans Indian weddings, birthdays, kitty parties and community events: exact budgets, timelines, vendor checklists and ideas.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#B3203A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Toran">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=Rozha+One&display=swap">
@@ -64,8 +69,25 @@
         <p class="eyebrow" id="plan-eyebrow"></p>
         <h1 id="plan-title" class="plan-title"></h1>
         <p class="plan-meta" id="plan-meta"></p>
-        <button type="button" class="btn-quiet" id="edit-answers">Change answers</button>
+        <div class="plan-actions">
+          <button type="button" class="btn-quiet" id="edit-answers">Change answers</button>
+          <button type="button" class="btn-primary" id="share-wa">Share on WhatsApp</button>
+          <button type="button" class="btn-quiet" id="copy-link">Copy plan link</button>
+          <button type="button" class="btn-quiet" id="save-pdf">Save as PDF</button>
+        </div>
+        <p class="share-note" id="share-note" role="status">Your plan lives on this phone. The plan link carries a copy of it, so anyone you send it to can open it. Our server never stores it.</p>
       </div>
+
+      <aside class="install" id="install" hidden aria-labelledby="install-title">
+        <div>
+          <h2 id="install-title">Keep Toran on your home screen</h2>
+          <p id="install-text">Your plan is saved on this phone. Adding Toran to your home screen keeps it one tap away and protects it from browser clean-ups.</p>
+        </div>
+        <div class="install-actions">
+          <button type="button" class="btn-primary" id="install-btn" hidden>Add to home screen</button>
+          <button type="button" class="btn-quiet" id="install-dismiss">Not now</button>
+        </div>
+      </aside>
 
       <div class="warnings" id="warnings" role="status"></div>
 
@@ -76,9 +98,9 @@
           <div class="spend-summary" id="spend-summary" hidden aria-live="polite"></div>
           <table class="budget">
             <caption class="sr-only">Budget split by category</caption>
-            <thead><tr><th scope="col">Category</th><th scope="col" class="num">Amount</th><th scope="col" class="num">Share</th></tr></thead>
+            <thead><tr><th scope="col">Category</th><th scope="col" class="num">Amount</th><th scope="col" class="num share">Share</th></tr></thead>
             <tbody id="budget-rows"></tbody>
-            <tfoot><tr><th scope="row">Total</th><td class="num" id="budget-total"></td><td class="num">100%</td></tr></tfoot>
+            <tfoot><tr><th scope="row">Total</th><td class="num" id="budget-total"></td><td class="num share">100%</td></tr></tfoot>
           </table>
           <p class="card-note">Amounts are estimates to plan with, and every line adds up to your exact total. Tick a booking in the timeline to record the final price: savings go into the buffer, and overspending comes out of it first.</p>
         </article>
