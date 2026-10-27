@@ -8,15 +8,139 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&family=Rozha+One&display=swap">
-  <link rel="stylesheet" href="/home.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=Rozha+One&display=swap">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
 </head>
 <body>
-  <main class="hero">
-    <img class="garland" src="/brand/toran-garland.svg" alt="" width="440" height="115">
-    <h1 class="wordmark">Toran</h1>
-    <p class="tagline">every celebration, sorted.</p>
-    <p class="note">The planner is being built. Every number in it is calculated, never guessed.</p>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Toran home">
+      <img src="/brand/toran-garland.svg" alt="" width="120" height="31">
+      <span class="brand-word">Toran</span>
+    </a>
+    <button type="button" class="btn-quiet" id="restart" hidden>Start over</button>
+  </header>
+
+  <main id="main">
+    <!-- Welcome -->
+    <section id="welcome" class="welcome" aria-labelledby="welcome-title">
+      <img class="welcome-garland" src="/brand/toran-garland.svg" alt="" width="440" height="115">
+      <h1 id="welcome-title" class="wordmark">Toran</h1>
+      <p class="tagline">every celebration, sorted.</p>
+      <p class="lede">Weddings, birthdays, kitty parties, jagrans and society functions. Tell me about your event and I'll build an exact budget, a timeline and a vendor checklist.</p>
+      <button type="button" class="btn-primary btn-big" id="start">Let's plan</button>
+      <p class="fineprint">Every number is calculated by code, never guessed by AI. Nothing you type is stored on our server.</p>
+    </section>
+
+    <!-- Interview -->
+    <section id="interview" class="interview" hidden aria-label="Planning conversation">
+      <div class="chat" id="chat" role="log" aria-live="polite" aria-relevant="additions"></div>
+
+      <div class="known" id="known" hidden>
+        <h2 class="known-title">What I've noted</h2>
+        <ul class="known-list" id="known-list"></ul>
+        <p class="known-hint" id="known-hint" hidden>Highlighted items are my guesses. Tap one to change it.</p>
+      </div>
+
+      <div class="answer" id="answer">
+        <div class="chips" id="chips" role="group" aria-label="Quick answers"></div>
+        <form class="composer" id="composer" autocomplete="off">
+          <label class="sr-only" for="say">Your answer</label>
+          <input id="say" name="say" type="text" maxlength="500" placeholder="Type your answer">
+          <input id="date" name="date" type="date" hidden aria-label="Event date">
+          <button type="button" class="btn-icon" id="mic" aria-label="Speak your answer" hidden>
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+          <button type="submit" class="btn-primary" id="send">Send</button>
+        </form>
+        <p class="mic-status" id="mic-status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <!-- Plan -->
+    <section id="plan" class="plan" hidden aria-labelledby="plan-title">
+      <div class="plan-head">
+        <p class="eyebrow" id="plan-eyebrow"></p>
+        <h1 id="plan-title" class="plan-title"></h1>
+        <p class="plan-meta" id="plan-meta"></p>
+        <button type="button" class="btn-quiet" id="edit-answers">Change answers</button>
+      </div>
+
+      <div class="warnings" id="warnings" role="status"></div>
+
+      <div class="grid">
+        <article class="card" aria-labelledby="budget-title">
+          <h2 id="budget-title">Budget</h2>
+          <p class="card-sub" id="budget-sub"></p>
+          <table class="budget">
+            <caption class="sr-only">Budget split by category</caption>
+            <thead><tr><th scope="col">Category</th><th scope="col" class="num">Amount</th><th scope="col" class="num">Share</th></tr></thead>
+            <tbody id="budget-rows"></tbody>
+            <tfoot><tr><th scope="row">Total</th><td class="num" id="budget-total"></td><td class="num">100%</td></tr></tfoot>
+          </table>
+          <p class="card-note">Amounts are estimates to plan with. Every line adds up to your exact total.</p>
+        </article>
+
+        <article class="card" aria-labelledby="timeline-title">
+          <h2 id="timeline-title">Timeline</h2>
+          <p class="card-sub" id="timeline-sub"></p>
+          <ol class="tasks" id="tasks"></ol>
+        </article>
+
+        <article class="card" aria-labelledby="vendors-title">
+          <h2 id="vendors-title">Vendor checklist</h2>
+          <p class="card-sub">Questions to ask before you pay any advance.</p>
+          <div id="vendors"></div>
+        </article>
+
+        <article class="card" aria-labelledby="ideas-title">
+          <h2 id="ideas-title">Ideas</h2>
+          <p class="card-sub" id="ideas-sub">Themes, decor, menu and invitation wording for your event.</p>
+          <button type="button" class="btn-primary" id="get-ideas">Get ideas</button>
+          <div id="ideas" aria-live="polite"></div>
+          <form class="refine" id="refine" hidden>
+            <label for="refine-text">Want something different?</label>
+            <div class="refine-row">
+              <input id="refine-text" type="text" maxlength="200" placeholder="e.g. more traditional, pastel colours, simpler menu">
+              <button type="submit" class="btn-quiet">Refine</button>
+            </div>
+          </form>
+        </article>
+      </div>
+    </section>
   </main>
+
+  <!-- Plan-ready animation -->
+  <div class="ready" id="ready" hidden aria-hidden="true">
+    <svg class="ready-garland" viewBox="0 0 420 76" width="440" height="80">
+      <path d="M4 6 L10 10 Q210 60 410 10 L416 6" fill="none" stroke="#B3203A" stroke-width="3" stroke-linecap="round"/>
+      <g fill="#2F7D4A">
+        <path d="M50 19 C43 26 45 36 50 41 C55 36 57 26 50 19Z"/><path d="M130 31 C123 38 125 48 130 53 C135 48 137 38 130 31Z"/>
+        <path d="M210 35 C203 42 205 54 210 60 C215 54 217 42 210 35Z"/><path d="M290 31 C283 38 285 48 290 53 C295 48 297 38 290 31Z"/>
+        <path d="M370 19 C363 26 365 36 370 41 C375 36 377 26 370 19Z"/>
+      </g>
+      <g fill="#F4A300"><circle cx="90" cy="34" r="10"/><circle cx="170" cy="42" r="10"/><circle cx="250" cy="42" r="10"/><circle cx="330" cy="34" r="10"/></g>
+      <g fill="none" stroke="#FFF6E6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <path class="tick t1" d="M85 34 L89 38 L96 30"/><path class="tick t2" d="M165 42 L169 46 L176 38"/>
+        <path class="tick t3" d="M245 42 L249 46 L256 38"/><path class="tick t4" d="M325 34 L329 38 L336 30"/>
+      </g>
+    </svg>
+    <div class="ready-word">
+      <span>T</span>
+      <svg class="ready-o" viewBox="0 0 140 140" width="76" height="76">
+        <g fill="#F4A300">
+          <circle cx="114" cy="70" r="20"/><circle cx="108.1" cy="92" r="20"/><circle cx="92" cy="108.1" r="20"/><circle cx="70" cy="114" r="20"/>
+          <circle cx="48" cy="108.1" r="20"/><circle cx="31.9" cy="92" r="20"/><circle cx="26" cy="70" r="20"/><circle cx="31.9" cy="48" r="20"/>
+          <circle cx="48" cy="31.9" r="20"/><circle cx="70" cy="26" r="20"/><circle cx="92" cy="31.9" r="20"/><circle cx="108.1" cy="48" r="20"/>
+          <circle cx="70" cy="70" r="46"/>
+        </g>
+        <circle cx="70" cy="70" r="31" fill="#E07B00"/>
+        <path class="tick t5" d="M54 71 L66 83 L88 58" fill="none" stroke="#FFF6E6" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>ran</span>
+    </div>
+    <p class="ready-text">Your plan is ready.</p>
+  </div>
 </body>
 </html>

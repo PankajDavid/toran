@@ -233,8 +233,15 @@ export function offlineIdeas(plan: PlanInput): Ideas {
     party: plan.subType === "kitty" ? "our kitty party" : "a get-together",
     community: "our community celebration",
   };
+  // Wedding themes are regional: only offer the ones that suit the chosen style.
+  const WEDDING_THEME_FOR: Record<string, string[]> = {
+    punjabi: ["Phulkari Bloom", "Ivory and Gold"],
+    "south-indian": ["Temple Traditions", "Ivory and Gold"],
+  };
+  const allowed = plan.eventType === "wedding" ? (WEDDING_THEME_FOR[plan.subType] ?? ["Ivory and Gold"]) : null;
+  const themes = OFFLINE_THEMES[plan.eventType].filter((t) => !allowed || allowed.includes(t.name));
   return {
-    themes: OFFLINE_THEMES[plan.eventType],
+    themes,
     decor: OFFLINE_DECOR[plan.eventType],
     menu: OFFLINE_MENU[diet],
     invitation: `With joy, we invite you to ${what[plan.eventType]} on ${longDate(plan.eventDate)}${plan.city ? ` in ${plan.city}` : ""}. Your presence will make the occasion complete.`,
