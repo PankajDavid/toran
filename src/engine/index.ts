@@ -5,3 +5,4 @@ export * from "./timeline.js";
 export * from "./vendors.js";
 export * from "./validate.js";
 export * from "./plan.js";
+export * from "./deals.js";

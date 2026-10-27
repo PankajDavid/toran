@@ -119,6 +119,7 @@ export async function runInterviewTurn(turn: InterviewTurn, today: string, ai: A
       try {
         const raw = await ai.generateJson({
           tier: "fast",
+          thinking: "minimal",
           timeoutMs: 8_000,
           system: AI_SYSTEM,
           schema: AI_SCHEMA as unknown as Record<string, unknown>,

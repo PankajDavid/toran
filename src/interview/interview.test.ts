@@ -156,6 +156,7 @@ describe("nextQuestion — the interview script", () => {
       totalBudgetINR: { totalBudgetINR: 1_500_000 },
       city: { city: "Khanna" },
       cityTier: { cityTier: 3 },
+      diet: { diet: "veg" },
     };
     for (let q = nextQuestion(k); q; q = nextQuestion(k)) {
       order.push(q.field);
@@ -182,7 +183,7 @@ describe("nextQuestion — the interview script", () => {
   });
 
   it("a finished interview produces input the planner accepts", () => {
-    const k = { eventType: "party" as const, subType: "kitty", eventDate: "2026-11-15", guestCount: 20, totalBudgetINR: 25_000, city: "Panchkula", cityTier: 2 as const };
+    const k = { eventType: "party" as const, subType: "kitty", eventDate: "2026-11-15", guestCount: 20, totalBudgetINR: 25_000, city: "Panchkula", cityTier: 2 as const, diet: "jain" as const };
     expect(() => buildPlan(toPlanInput(k), TODAY)).not.toThrow();
   });
 });
@@ -244,5 +245,23 @@ describe("runInterviewTurn — local first, AI only for gaps", () => {
   it("reports which fields were noted this turn", async () => {
     const r = await runInterviewTurn({ text: "kitty party, 20 log" }, TODAY, offlineClient);
     expect(r.noted.sort()).toEqual(["eventType", "guestCount", "subType"]);
+  });
+});
+
+describe("food question", () => {
+  const base = { eventDate: "2027-01-10", guestCount: 100, totalBudgetINR: 1_00_000, city: "Panchkula", cityTier: 2 as const };
+  it("is asked for every event type before the plan is built", () => {
+    const q = nextQuestion({ eventType: "party", subType: "kitty", ...base });
+    expect(q!.field).toBe("diet");
+    expect(q!.options.map((o) => o.set.diet)).toEqual(["veg", "jain", "non-veg", "mixed"]);
+  });
+  it("offers only vegetarian options for a langar or jagran", () => {
+    for (const subType of ["langar", "jagran"]) {
+      const q = nextQuestion({ eventType: "community", subType, ...base });
+      expect(q!.options.map((o) => o.set.diet)).toEqual(["veg", "jain"]);
+    }
+  });
+  it("is skipped when the user already said it", () => {
+    expect(nextQuestion({ eventType: "party", subType: "kitty", ...base, diet: "veg" })).toBeNull();
   });
 });

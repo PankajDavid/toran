@@ -9,6 +9,8 @@ interface TaskTemplate {
   leadDays: number;
   /** If set, the task only applies when one of these sub-types / sub-events is chosen. */
   onlyFor?: string[];
+  /** Budget category this task books. Ticking it asks for the agreed price. */
+  books?: string;
 }
 
 export interface TimelineTask {
@@ -18,6 +20,8 @@ export interface TimelineTask {
   idealDate: string;
   daysBeforeEvent: number;
   status: "late" | "due-soon" | "upcoming";
+  /** Budget category key this task books, if any (set when the category exists in the plan). */
+  books?: string;
 }
 
 export interface TimelineResult {
@@ -33,17 +37,17 @@ export interface TimelineResult {
 const TEMPLATES: Record<EventType, TaskTemplate[]> = {
   wedding: [
     { id: "w-budget", title: "Agree total budget and draft guest list with both families", leadDays: 180 },
-    { id: "w-venue", title: "Book venue(s)", leadDays: 150 },
-    { id: "w-caterer", title: "Shortlist caterers, do tastings, book one", leadDays: 120 },
-    { id: "w-photo", title: "Book photographer and videographer", leadDays: 120 },
-    { id: "w-decor", title: "Book decorator and finalise theme", leadDays: 90 },
-    { id: "w-outfits", title: "Order wedding outfits (allow alteration time)", leadDays: 90 },
+    { id: "w-venue", title: "Book venue(s)", leadDays: 150, books: "venue" },
+    { id: "w-caterer", title: "Shortlist caterers, do tastings, book one", leadDays: 120, books: "catering" },
+    { id: "w-photo", title: "Book photographer and videographer", leadDays: 120, books: "photo-video" },
+    { id: "w-decor", title: "Book decorator and finalise theme", leadDays: 90, books: "decor" },
+    { id: "w-outfits", title: "Order wedding outfits (allow alteration time)", leadDays: 90, books: "outfits" },
     { id: "w-save-date", title: "Send save-the-dates to outstation guests", leadDays: 75 },
-    { id: "w-stay", title: "Block rooms and plan transport for outstation guests", leadDays: 60 },
-    { id: "w-makeup", title: "Book makeup artist", leadDays: 60 },
-    { id: "w-dj", title: "Book DJ / dhol / band for sangeet", leadDays: 60, onlyFor: ["sangeet"] },
-    { id: "w-mehendi", title: "Book mehendi artist", leadDays: 45, onlyFor: ["mehendi"] },
-    { id: "w-invites", title: "Print and send invitations", leadDays: 45 },
+    { id: "w-stay", title: "Block rooms and plan transport for outstation guests", leadDays: 60, books: "logistics" },
+    { id: "w-makeup", title: "Book makeup artist", leadDays: 60, books: "beauty" },
+    { id: "w-dj", title: "Book DJ / dhol / band for sangeet", leadDays: 60, onlyFor: ["sangeet"], books: "entertainment" },
+    { id: "w-mehendi", title: "Book mehendi artist", leadDays: 45, onlyFor: ["mehendi"], books: "beauty" },
+    { id: "w-invites", title: "Print and send invitations", leadDays: 45, books: "invites-gifts" },
     { id: "w-choreo", title: "Start sangeet choreography rehearsals", leadDays: 30, onlyFor: ["sangeet"] },
     { id: "w-rsvp", title: "Chase RSVPs and confirm final guest count", leadDays: 14 },
     { id: "w-haldi", title: "Arrange haldi supplies and outfits", leadDays: 7, onlyFor: ["haldi"] },
@@ -53,36 +57,36 @@ const TEMPLATES: Record<EventType, TaskTemplate[]> = {
     { id: "w-brief", title: "Brief the day-of coordinator and family point people", leadDays: 1 },
   ],
   birthday: [
-    { id: "b-venue", title: "Book venue or confirm home setup", leadDays: 30 },
+    { id: "b-venue", title: "Book venue or confirm home setup", leadDays: 30, books: "venue" },
     { id: "b-invites", title: "Send invitations", leadDays: 21 },
-    { id: "b-ent", title: "Book entertainer / games / music", leadDays: 21 },
-    { id: "b-decor", title: "Plan theme and order decor", leadDays: 14 },
-    { id: "b-cake", title: "Order cake", leadDays: 10 },
-    { id: "b-gifts", title: "Buy return gifts", leadDays: 10, onlyFor: ["kid"] },
+    { id: "b-ent", title: "Book entertainer / games / music", leadDays: 21, books: "entertainment" },
+    { id: "b-decor", title: "Plan theme and order decor", leadDays: 14, books: "decor" },
+    { id: "b-cake", title: "Order cake", leadDays: 10, books: "cake" },
+    { id: "b-gifts", title: "Buy return gifts", leadDays: 10, onlyFor: ["kid"], books: "return-gifts" },
     { id: "b-rsvp", title: "Confirm RSVPs", leadDays: 5 },
     { id: "b-headcount", title: "Give final headcount for food", leadDays: 3 },
     { id: "b-day", title: "Day-before checklist: candles, lighter, plates, music", leadDays: 1 },
   ],
   party: [
-    { id: "p-venue", title: "Book the venue or confirm hosting at home", leadDays: 21 },
+    { id: "p-venue", title: "Book the venue or confirm hosting at home", leadDays: 21, books: "venue" },
     { id: "p-invites", title: "Send invitations", leadDays: 14 },
     { id: "p-theme", title: "Decide theme and dress code", leadDays: 10 },
-    { id: "p-games", title: "Plan games and buy prizes", leadDays: 7, onlyFor: ["kitty"] },
-    { id: "p-cake", title: "Order cake", leadDays: 7, onlyFor: ["anniversary"] },
-    { id: "p-food", title: "Confirm menu and headcount", leadDays: 4 },
+    { id: "p-games", title: "Plan games and buy prizes", leadDays: 7, onlyFor: ["kitty"], books: "games-prizes" },
+    { id: "p-cake", title: "Order cake", leadDays: 7, onlyFor: ["anniversary"], books: "cake" },
+    { id: "p-food", title: "Confirm menu and headcount", leadDays: 4, books: "catering" },
     { id: "p-day", title: "Day-before checklist: seating, music, serving, gifts", leadDays: 1 },
   ],
   community: [
     { id: "c-permits", title: "Get permissions (RWA / police / municipal) as needed", leadDays: 45 },
-    { id: "c-venue", title: "Book ground / tent and seating", leadDays: 40 },
-    { id: "c-sound", title: "Book sound and lighting", leadDays: 30 },
-    { id: "c-mandali", title: "Book bhajan mandali", leadDays: 30, onlyFor: ["jagran"] },
-    { id: "c-performers", title: "Line up performers and games", leadDays: 30, onlyFor: ["diwali-mela", "rwa-function", "other"] },
+    { id: "c-venue", title: "Book ground / tent and seating", leadDays: 40, books: "venue" },
+    { id: "c-sound", title: "Book sound and lighting", leadDays: 30, books: "sound-lighting" },
+    { id: "c-mandali", title: "Book bhajan mandali", leadDays: 30, onlyFor: ["jagran"], books: "performers" },
+    { id: "c-performers", title: "Line up performers and games", leadDays: 30, onlyFor: ["diwali-mela", "rwa-function", "other"], books: "entertainment" },
     { id: "c-stalls", title: "Allot stalls and collect stall fees", leadDays: 21, onlyFor: ["diwali-mela"] },
     { id: "c-volunteers", title: "Form volunteer teams and assign leads", leadDays: 21 },
     { id: "c-promo", title: "Announce on society groups and notice boards", leadDays: 21 },
-    { id: "c-ration", title: "Order ration and confirm cooking volunteers", leadDays: 10, onlyFor: ["langar"] },
-    { id: "c-food", title: "Confirm food arrangements and quantities", leadDays: 14, onlyFor: ["jagran", "diwali-mela", "rwa-function", "other"] },
+    { id: "c-ration", title: "Order ration and confirm cooking volunteers", leadDays: 10, onlyFor: ["langar"], books: "catering" },
+    { id: "c-food", title: "Confirm food arrangements and quantities", leadDays: 14, onlyFor: ["jagran", "diwali-mela", "rwa-function", "other"], books: "catering" },
     { id: "c-safety", title: "Arrange first aid, fire safety and crowd plan", leadDays: 7 },
     { id: "c-cleanup", title: "Plan cleanup and waste segregation", leadDays: 3 },
     { id: "c-brief", title: "Brief all volunteer leads", leadDays: 1 },
@@ -122,6 +126,7 @@ export function buildTimeline(
         idealDate: fromDayNumber(idealDay),
         daysBeforeEvent: eventDay - dueDay,
         status,
+        ...(t.books ? { books: t.books } : {}),
       };
     })
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || b.daysBeforeEvent - a.daysBeforeEvent);

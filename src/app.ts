@@ -116,7 +116,11 @@ export function createApp(opts: AppOptions = {}) {
 
   app.post("/api/plan", planLimiter, (req, res) => {
     try {
-      res.json(buildPlan(req.body, today()));
+      // Bookings travel alongside the plan input but are validated separately.
+      const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? { ...req.body } : req.body;
+      const deals = body && typeof body === "object" && "deals" in body ? body.deals : [];
+      if (body && typeof body === "object") delete body.deals;
+      res.json(buildPlan(body, today(), deals));
     } catch (err) {
       if (err instanceof PlanInputError) {
         res.status(400).json({ error: "Please check your inputs.", issues: err.issues });

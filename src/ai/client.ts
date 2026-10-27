@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 /**
  * The one door to the AI. Everything else talks to this interface, so tests
@@ -20,6 +20,8 @@ export interface AiJsonRequest {
   schema: Record<string, unknown>;
   /** "fast" for parsing small answers, "smart" for reading documents and ideas. */
   tier?: "fast" | "smart";
+  /** How long the model may "think" before answering. Lower = faster. */
+  thinking?: "minimal" | "low";
   timeoutMs?: number;
 }
 
@@ -75,6 +77,9 @@ export function createGeminiClient(opts: GeminiOptions): AiClient {
             systemInstruction: req.system,
             responseMimeType: "application/json",
             responseJsonSchema: req.schema,
+            ...(req.thinking
+              ? { thinkingConfig: { thinkingLevel: req.thinking === "minimal" ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW } }
+              : {}),
             abortSignal: controller.signal,
           },
         });
@@ -114,6 +119,7 @@ export async function aiSelfCheck(ai: AiClient, log: (line: string) => void = co
     try {
       const r = (await ai.generateJson({
         tier,
+        thinking: tier === "fast" ? "minimal" : "low", // same settings the app uses
         timeoutMs: 20_000,
         system: 'Reply with the JSON object {"ok": true}.',
         parts: [{ text: "ping" }],

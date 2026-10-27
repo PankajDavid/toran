@@ -65,7 +65,7 @@
 
   /* ---------- state ---------- */
   let state = load() || fresh();
-  function fresh() { return { known: {}, guessed: [], planInput: null, plan: null, done: {}, ideas: null, chat: [] }; }
+  function fresh() { return { known: {}, guessed: [], planInput: null, plan: null, done: {}, deals: {}, ideas: null, chat: [] }; }
   function load() {
     try { const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); return s && typeof s === "object" ? { ...fresh(), ...s } : null; }
     catch { return null; }
@@ -287,9 +287,35 @@
   }
 
   /* ---------- plan ---------- */
+  /** Bookings recorded on this device, sent with the plan so code can re-balance the budget. */
+  function dealList() {
+    return Object.entries(state.deals || {}).map(([taskId, d]) => ({ taskId, agreedINR: d.agreedINR, advanceINR: d.advanceINR }));
+  }
+
+  /** Re-runs the calculator (no AI) after a booking changes. */
+  async function refreshPlan() {
+    try {
+      state.plan = await api("/api/plan", { ...state.planInput, deals: dealList() });
+      save();
+    } catch {
+      $("warnings").prepend(el("p", { class: "warning" }, "Couldn't update the budget just now. Please try again."));
+    }
+    renderPlan();
+  }
+
+  /** Reads "2,80,000", "280000", "2.8 lakh", "2.8L" or "75k" as whole rupees. */
+  function parseRupees(text) {
+    const t = String(text).toLowerCase().replace(/[₹,\s]|rs\.?/g, "");
+    const m = /^(\d+(?:\.\d+)?)(crore|cr|lakh|lakhs|lac|l|k)?$/.exec(t);
+    if (!m) return null;
+    const mult = { crore: 1e7, cr: 1e7, lakh: 1e5, lakhs: 1e5, lac: 1e5, l: 1e5, k: 1e3 }[m[2]] || 1;
+    const n = Math.round(Number(m[1]) * mult);
+    return Number.isFinite(n) && n >= 0 && n <= 5e7 ? n : null;
+  }
+
   async function buildPlan(planInput) {
     try {
-      const plan = await api("/api/plan", planInput);
+      const plan = await api("/api/plan", { ...planInput, deals: dealList() });
       state.planInput = planInput;
       state.plan = plan;
       state.ideas = null;
@@ -313,6 +339,42 @@
     setTimeout(() => { clone.hidden = true; }, 4500);
   }
 
+  /** Inline "deal closed" form under a booking task. */
+  function openBooking(li, task, line) {
+    if (li.querySelector(".booking")) return;
+    const agreedId = `agreed-${task.id}`, advId = `adv-${task.id}`;
+    const msg = el("p", { class: "booking-msg", role: "alert" });
+    const agreed = el("input", { id: agreedId, type: "text", inputmode: "decimal", placeholder: "e.g. 2,80,000 or 2.8 lakh", required: true });
+    const advance = el("input", { id: advId, type: "text", inputmode: "decimal", placeholder: "0 if none yet" });
+    const form = el("form", { class: "booking" },
+      el("p", { class: "booking-title" }, `Booked! ${line ? `Planned for ${line.label}: ${inr(line.amountINR)}.` : ""}`),
+      el("label", { for: agreedId }, "Final agreed price"), agreed,
+      el("label", { for: advId }, "Advance paid"), advance,
+      msg,
+      el("div", { class: "booking-actions" },
+        el("button", { type: "submit", class: "btn-primary" }, "Save booking"),
+        el("button", { type: "button", class: "btn-quiet", onclick: () => {
+          state.done[task.id] = true;
+          save();
+          renderPlan();
+        } }, "Just mark done"),
+        el("button", { type: "button", class: "btn-quiet", onclick: () => form.remove() }, "Cancel")));
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const a = parseRupees(agreed.value);
+      const adv = advance.value.trim() ? parseRupees(advance.value) : 0;
+      if (a === null) { msg.textContent = "Enter the agreed price in rupees, like 2,80,000 or 2.8 lakh."; agreed.focus(); return; }
+      if (adv === null) { msg.textContent = "Enter the advance in rupees, or leave it empty."; advance.focus(); return; }
+      if (adv > a) { msg.textContent = "The advance can't be more than the agreed price."; advance.focus(); return; }
+      state.deals[task.id] = { agreedINR: a, advanceINR: adv };
+      state.done[task.id] = true;
+      save();
+      refreshPlan();
+    });
+    li.append(form);
+    agreed.focus();
+  }
+
   function renderPlan() {
     const p = state.plan;
     if (!p) return;
@@ -331,37 +393,82 @@
     const warnings = $("warnings");
     warnings.replaceChildren(...p.warnings.map((w) => el("p", { class: "warning" }, w.message)));
 
-    // Budget
-    $("budget-sub").textContent = `${inr(p.budget.perGuestINR)} per guest · food ${inr(p.budget.foodPerGuestINR)} per guest`;
+    // Budget (re-balanced from any bookings the user recorded)
+    const sp = p.spending;
+    const subParts = [`${inr(p.budget.perGuestINR)} per guest`, `food ${inr(p.budget.foodPerGuestINR)} per guest`];
+    $("budget-sub").textContent = subParts.join(" · ");
+    const summary = $("spend-summary");
+    summary.replaceChildren();
+    summary.hidden = !sp.bookedCount;
+    if (sp.bookedCount) {
+      summary.append(
+        el("div", null, el("span", { class: "k" }, "Booked"), el("strong", null, inr(sp.agreedINR))),
+        el("div", null, el("span", { class: "k" }, "Advance paid"), el("strong", null, inr(sp.advanceINR))),
+        el("div", null, el("span", { class: "k" }, "Balance due"), el("strong", null, inr(sp.dueINR))),
+        el("div", { class: sp.overBudgetINR ? "over" : "" },
+          el("span", { class: "k" }, sp.overBudgetINR ? "Over budget" : "Buffer left"),
+          el("strong", null, inr(sp.overBudgetINR || sp.contingencyNowINR))),
+      );
+    }
+    const bpByKey = Object.fromEntries(p.budget.lines.map((l) => [l.key, l.bp]));
     const maxBp = Math.max(...p.budget.lines.map((l) => l.bp));
-    $("budget-rows").replaceChildren(...p.budget.lines.map((l) => {
+    $("budget-rows").replaceChildren(...sp.lines.map((l) => {
       const bar = el("span", { class: "bar", "aria-hidden": "true" });
-      bar.style.width = `${Math.max(3, (l.bp / maxBp) * 100)}%`; // biggest line fills the cell
-      return el("tr", null,
-        el("th", { scope: "row" }, l.label, bar),
-        el("td", { class: "num" }, inr(l.amountINR)),
-        el("td", { class: "num" }, pct(l.bp)));
+      bar.style.width = `${Math.max(3, (bpByKey[l.key] / maxBp) * 100)}%`; // biggest line fills the cell
+      const isBuffer = l.key === "contingency";
+      let note = null;
+      if (l.booked) {
+        const diff = l.differenceINR;
+        note = el("span", { class: "line-note" },
+          `Booked · planned ${inr(l.plannedINR)}` +
+          (diff ? ` · ${diff > 0 ? "over by " + inr(diff) : "saved " + inr(-diff)}` : "") +
+          ` · advance ${inr(l.advanceINR)} · due ${inr(l.dueINR)}`);
+      } else if (isBuffer && sp.bookedCount && sp.contingencyNowINR !== l.plannedINR) {
+        note = el("span", { class: "line-note" }, `Planned ${inr(l.plannedINR)} · adjusted for your bookings`);
+      }
+      const amount = l.booked ? l.agreedINR : isBuffer ? sp.contingencyNowINR : l.plannedINR;
+      return el("tr", { class: l.booked ? "booked" : "" },
+        el("th", { scope: "row" }, l.label, l.booked ? el("span", { class: "badge booked" }, "booked") : null, note, bar),
+        el("td", { class: "num" }, inr(amount)),
+        el("td", { class: "num" }, pct(bpByKey[l.key])));
     }));
-    $("budget-total").textContent = inr(p.budget.totalINR);
+    // Total = what the lines above add up to. When bookings push past the budget, say both.
+    const projected = sp.projectedSpendINR;
+    $("budget-total").textContent = sp.overBudgetINR ? `${inr(projected)} (budget ${inr(p.budget.totalINR)})` : inr(projected);
 
     // Timeline
     const doneCount = p.timeline.tasks.filter((t) => state.done[t.id]).length;
     $("timeline-sub").textContent = `${doneCount} of ${p.timeline.tasks.length} done${p.timeline.lateCount ? ` · ${p.timeline.lateCount} behind schedule` : ""}`;
+    const lineLabel = Object.fromEntries(p.budget.lines.map((l) => [l.key, l]));
     $("tasks").replaceChildren(...p.timeline.tasks.map((t) => {
       const id = `task-${t.id}`;
       const done = !!state.done[t.id];
+      const deal = state.deals[t.id];
       const box = el("input", { type: "checkbox", id });
       box.checked = done;
+      const li = el("li", { class: `task${done ? " done" : ""}` });
       box.addEventListener("change", () => {
+        if (box.checked && t.books && !deal) {
+          box.checked = false; // stays unticked until the booking is saved or skipped
+          openBooking(li, t, lineLabel[t.books]);
+          return;
+        }
         state.done[t.id] = box.checked;
+        if (!box.checked && deal) {
+          delete state.deals[t.id];
+          save();
+          refreshPlan();
+          return;
+        }
         save();
         renderPlan();
       });
       const when = t.status === "late" ? `Ideally by ${fmtDate(t.idealDate)} · do it now` : `By ${fmtDate(t.dueDate)}`;
-      return el("li", { class: `task${done ? " done" : ""}` }, box,
+      li.append(box,
         el("label", { for: id }, t.title,
           !done && t.status !== "upcoming" ? el("span", { class: `badge ${t.status}` }, t.status === "late" ? "late" : "this week") : null,
-          el("span", { class: "when" }, when)));
+          el("span", { class: "when" }, deal ? `Booked for ${inr(deal.agreedINR)} · advance ${inr(deal.advanceINR)}` : when)));
+      return li;
     }));
 
     // Vendors
@@ -402,7 +509,7 @@
   async function loadIdeas(refine) {
     const btn = $("get-ideas");
     btn.disabled = true;
-    btn.textContent = "Thinking up ideas…";
+    btn.textContent = "Thinking up ideas… (about 10 seconds)";
     const box = $("ideas");
     if (refine) box.prepend(el("p", { class: "source-note" }, "Refining…"));
     try {
@@ -445,6 +552,8 @@
   /* ---------- restore on load ---------- */
   for (const m of state.chat) renderMsg(m.who, m.text);
   renderKnown();
+  if (!state.deals) state.deals = {};
+  if (state.plan && !state.plan.spending) { state.plan = null; } // plan saved by an older version
   if (state.plan) { renderPlan(); show("plan"); }
   else if (state.chat.length) { show("interview"); turn({}); }
 })();

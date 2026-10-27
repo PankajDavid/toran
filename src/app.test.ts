@@ -33,6 +33,8 @@ describe("HTTP API", () => {
     expect(r.guessed).toContain("subType");
     expect(r.next.field).toBe("subEvents");
     r = await turn({ known: r.known, guessed: r.guessed, set: { subEvents: ["mehendi", "ceremony"] } });
+    expect(r.next.field).toBe("diet");
+    r = await turn({ known: r.known, guessed: r.guessed, set: { diet: "veg" } });
     expect(r.next).toBeNull();
     const plan = await post(r.planInput).then((x) => x.json());
     expect(plan.budget.totalINR).toBe(1_500_000);
@@ -47,6 +49,14 @@ describe("HTTP API", () => {
     const body = await res.json();
     expect(body.source).toBe("offline");
     expect(JSON.stringify(body.ideas.menu)).not.toMatch(/onion|garlic|potato|chicken/i);
+  });
+
+  it("accepts bookings alongside the plan and re-balances the budget", async () => {
+    const plan = await post({ ...valid, deals: [{ taskId: "b-venue", agreedINR: 5_000, advanceINR: 1_000 }] }).then((x) => x.json());
+    expect(plan.spending.bookedCount).toBe(1);
+    expect(plan.input.deals).toBeUndefined();
+    const bad = await post({ ...valid, deals: [{ taskId: "b-venue", agreedINR: 5_000, advanceINR: 9_000 }] });
+    expect(bad.status).toBe(400);
   });
 
   it("rejects malformed interview turns", async () => {

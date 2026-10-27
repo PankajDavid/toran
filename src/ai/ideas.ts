@@ -158,11 +158,14 @@ export async function generateIdeas(
       if (extra.theme) parts.push(asData("family_notes", `Preferred theme: ${extra.theme}`));
       if (extra.notes) parts.push(asData("family_notes", extra.notes));
       if (extra.refine) parts.push(asData("refine_request", extra.refine));
-      const raw = await ai.generateJson({ tier: "smart", timeoutMs: 20_000, system: SYSTEM, schema: AI_SCHEMA, parts });
+      const raw = await ai.generateJson({ tier: "smart", thinking: "low", timeoutMs: 30_000, system: SYSTEM, schema: AI_SCHEMA, parts });
       const clean = sanitizeIdeas(raw, plan.diet);
       if (clean) return { ideas: clean.ideas, source: "ai", removed: clean.removed };
-    } catch {
-      // fall through to the offline set
+      console.warn("AI ideas: fallback to offline (output failed checks)");
+    } catch (err) {
+      // Outcome only — never the plan, notes or AI text.
+      const e = err as { kind?: string; detail?: string };
+      console.warn(`AI ideas: fallback to offline (${e.kind ?? "error"}${e.detail ? ` ${e.detail}` : ""})`);
     }
   }
   return { ideas: offlineIdeas(plan), source: "offline", removed: 0 };

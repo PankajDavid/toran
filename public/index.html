@@ -73,13 +73,14 @@
         <article class="card" aria-labelledby="budget-title">
           <h2 id="budget-title">Budget</h2>
           <p class="card-sub" id="budget-sub"></p>
+          <div class="spend-summary" id="spend-summary" hidden aria-live="polite"></div>
           <table class="budget">
             <caption class="sr-only">Budget split by category</caption>
             <thead><tr><th scope="col">Category</th><th scope="col" class="num">Amount</th><th scope="col" class="num">Share</th></tr></thead>
             <tbody id="budget-rows"></tbody>
             <tfoot><tr><th scope="row">Total</th><td class="num" id="budget-total"></td><td class="num">100%</td></tr></tfoot>
           </table>
-          <p class="card-note">Amounts are estimates to plan with. Every line adds up to your exact total.</p>
+          <p class="card-note">Amounts are estimates to plan with, and every line adds up to your exact total. Tick a booking in the timeline to record the final price: savings go into the buffer, and overspending comes out of it first.</p>
         </article>
 
         <article class="card" aria-labelledby="timeline-title">

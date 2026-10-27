@@ -124,7 +124,7 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 16px 64px; }
 .bar { display: block; height: 4px; background: var(--marigold); border-radius: 2px; margin-top: 3px; }
 .tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 520px; overflow-y: auto; }
 .task { display: flex; gap: 10px; align-items: flex-start; padding: 6px 4px; border-bottom: 1px solid var(--line); }
-.task input { width: 22px; height: 22px; margin-top: 3px; accent-color: var(--leaf); flex: none; }
+.task > input[type="checkbox"] { width: 22px; height: 22px; margin-top: 3px; accent-color: var(--leaf); flex: none; }
 .task label { flex: 1; cursor: pointer; }
 .task .when { display: block; font-size: 14px; color: var(--muted); }
 .task.done label { color: var(--muted); text-decoration: line-through; }
@@ -147,6 +147,24 @@ details.vendor ul { margin: 6px 0 4px; padding-left: 20px; }
 .refine label { font-weight: 600; display: block; margin-bottom: 4px; }
 .refine-row { display: flex; gap: 8px; }
 .refine-row input { flex: 1; min-width: 0; min-height: 44px; border: 1.5px solid var(--line); border-radius: 999px; padding: 0 14px; font: inherit; background: var(--cream); }
+
+/* Bookings */
+.spend-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0 0 12px; }
+.spend-summary div { background: var(--cream); border-radius: 10px; padding: 8px 10px; }
+.spend-summary .k { display: block; font-size: 13px; color: var(--muted); }
+.spend-summary strong { font-variant-numeric: tabular-nums; }
+.spend-summary .over { background: #FBE3E7; color: var(--late); }
+.line-note { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+.badge.booked { background: #E3F1E7; color: var(--leaf); }
+tr.booked th { color: var(--leaf); }
+.booking { flex-basis: 100%; margin: 6px 0 4px 32px; padding: 12px; background: var(--cream); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; gap: 4px; }
+.booking-title { margin: 0 0 4px; font-weight: 700; }
+.booking label { font-size: 14px; font-weight: 600; }
+.booking input { min-height: 44px; border: 1.5px solid var(--line); border-radius: 10px; padding: 0 12px; font: inherit; background: var(--paper); }
+.booking-msg { margin: 0; color: var(--late); font-size: 14px; min-height: 1em; }
+.booking-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.task { flex-wrap: wrap; }
+@media (max-width: 760px) { .spend-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .booking { margin-left: 0; } }
 
 /* Plan-ready animation */
 .ready {

@@ -166,6 +166,28 @@ export function nextQuestion(k: Known): Question | null {
     };
   }
 
+  if (!k.diet) {
+    // Langar and jagran food is vegetarian by tradition, so only offer what fits.
+    const religiousVeg = type === "community" && (k.subType === "langar" || k.subType === "jagran");
+    return {
+      field: "diet",
+      text: "What food will you serve? This shapes the menu ideas.",
+      mode: "single",
+      input: "none",
+      options: religiousVeg
+        ? [
+            { label: "Pure veg", set: { diet: "veg" } },
+            { label: "Jain (no onion, garlic)", set: { diet: "jain" } },
+          ]
+        : [
+            { label: "Pure veg", set: { diet: "veg" } },
+            { label: "Jain (no onion, garlic)", set: { diet: "jain" } },
+            { label: "Non-veg", set: { diet: "non-veg" } },
+            { label: "Both veg and non-veg", set: { diet: "mixed" } },
+          ],
+    };
+  }
+
   return null;
 }
 
