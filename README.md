@@ -4,6 +4,8 @@ A GenAI planning assistant for Indian weddings, birthdays and community events â
 
 Built for **PromptWars Virtual** (Google Ã— Hack2Skill), using Claude Code as the AI build partner.
 
+**Live:** https://toran.up.railway.app
+
 ## The idea: numbers you can trust
 
 Most AI planners ask a language model to write the budget. Language models are bad at arithmetic, so the totals often don't add up.

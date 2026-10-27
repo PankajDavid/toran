@@ -4,6 +4,7 @@ GenAI planning assistant for Indian weddings, birthdays, kitty parties and commu
 Pitch: "Every number is calculated by code, traced to a source, or read from a quote in your hand."
 Built for PromptWars Virtual Challenge 5 (Google x Hack2Skill). Final deadline: 1 Nov 2026, 11:59 PM IST.
 Concept doc: https://claude.ai/artifact/KSkuKFyLLpA5ofmtNtTP99
+Live: https://toran.up.railway.app · Repo: github.com/PankajDavid/toran · Railway project/service: toran
 
 ## Brand
 - Name: Toran (the festive door garland). Tagline: "every celebration, sorted."
