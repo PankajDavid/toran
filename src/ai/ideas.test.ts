@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AiError, asData, offlineClient } from "./client.js";
+import { AiError, aiSelfCheck, asData, offlineClient } from "./client.js";
 import { fakeAiClient } from "./fake.js";
 import { generateIdeas, offlineIdeas, sanitizeIdeas } from "./ideas.js";
 import { parsePlanInput } from "../engine/validate.js";
@@ -115,5 +115,25 @@ describe("offline wedding themes match the regional style", () => {
     const names = offlineIdeas(plan()).themes.map((t) => t.name);
     expect(names).toContain("Phulkari Bloom");
     expect(names).not.toContain("Temple Traditions");
+  });
+});
+
+describe("aiSelfCheck", () => {
+  it("logs ok for both models when the AI answers", async () => {
+    const lines: string[] = [];
+    await aiSelfCheck(fakeAiClient([{ ok: true }, { ok: true }]), (l) => lines.push(l));
+    expect(lines).toEqual(["AI self-check (fast): ok", "AI self-check (smart): ok"]);
+  });
+
+  it("logs the failure kind and status, never anything else", async () => {
+    const lines: string[] = [];
+    await aiSelfCheck(fakeAiClient([new AiError("upstream", "x", "404 NOT_FOUND"), { ok: true }]), (l) => lines.push(l));
+    expect(lines[0]).toBe("AI self-check (fast): FAILED — upstream (404 NOT_FOUND)");
+  });
+
+  it("says offline when no key is set", async () => {
+    const lines: string[] = [];
+    await aiSelfCheck(offlineClient, (l) => lines.push(l));
+    expect(lines[0]).toContain("offline");
   });
 });

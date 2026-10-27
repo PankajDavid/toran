@@ -33,6 +33,8 @@ export class AiError extends Error {
   constructor(
     public readonly kind: "unavailable" | "timeout" | "bad-output" | "upstream",
     message: string,
+    /** Server-log-only diagnostic (e.g. HTTP status). Never sent to clients. */
+    public readonly detail?: string,
   ) {
     super(message);
     this.name = "AiError";
@@ -87,12 +89,42 @@ export function createGeminiClient(opts: GeminiOptions): AiClient {
         if (err instanceof AiError) throw err;
         if (controller.signal.aborted) throw new AiError("timeout", "AI request timed out");
         // Never surface upstream messages to users; they can contain request details.
-        throw new AiError("upstream", "AI request failed");
+        // Keep only the HTTP status and Google's status word for server-side diagnosis.
+        const e = err as { status?: number; message?: string };
+        const statusWord = /\b(NOT_FOUND|PERMISSION_DENIED|UNAUTHENTICATED|INVALID_ARGUMENT|RESOURCE_EXHAUSTED|FAILED_PRECONDITION|UNAVAILABLE)\b/.exec(e?.message ?? "")?.[1];
+        throw new AiError("upstream", "AI request failed", [e?.status, statusWord].filter(Boolean).join(" ") || undefined);
       } finally {
         clearTimeout(timer);
       }
     },
   };
+}
+
+/**
+ * One tiny request per model at startup, so every deploy logs whether the AI
+ * really works (key valid, model names right). Logs only the outcome — no keys,
+ * no user data.
+ */
+export async function aiSelfCheck(ai: AiClient, log: (line: string) => void = console.log): Promise<void> {
+  if (!ai.available) {
+    log("AI self-check: offline (no GEMINI_API_KEY) — fallbacks in use");
+    return;
+  }
+  for (const tier of ["fast", "smart"] as const) {
+    try {
+      const r = (await ai.generateJson({
+        tier,
+        timeoutMs: 20_000,
+        system: 'Reply with the JSON object {"ok": true}.',
+        parts: [{ text: "ping" }],
+        schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] },
+      })) as { ok?: unknown };
+      log(`AI self-check (${tier}): ${r?.ok === true ? "ok" : "unexpected reply"}`);
+    } catch (err) {
+      const e = err as AiError;
+      log(`AI self-check (${tier}): FAILED — ${e.kind ?? "error"}${e.detail ? ` (${e.detail})` : ""}`);
+    }
+  }
 }
 
 export function aiClientFromEnv(env: NodeJS.ProcessEnv = process.env): AiClient {
