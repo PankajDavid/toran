@@ -875,15 +875,18 @@
    */
   function priceLinks(c, city) {
     const where = city || "India";
-    const qs = [
-      `${c.search} price ${where}`,
-      `${c.search} rates ${where} wedmegood`,
-      `${c.search} ${where} justdial`,
-    ];
+    const guests = state.plan.input.guestCount;
+    const unitHint = c.line === "catering" ? ` per plate for ${guests} guests` : c.line === "venue" ? ` for ${guests} guests` : "";
+    // udm=50 opens Google's AI Mode, which searches and cites its sources. If it isn't
+    // available, Google shows normal results for the same question.
+    const ask = `What do ${c.search} in ${where} typically charge${unitHint}? Show price ranges with sources.`;
+    const qs = [`${c.search} price ${where}`, `${c.search} rates ${where} wedmegood`];
+    const g = (q, ai) => "https://www.google.com/search?q=" + encodeURIComponent(q) + (ai ? "&udm=50" : "");
     return el("div", { class: "v-price" },
-      el("p", { class: "v-price-label" }, `Published prices vary a lot and are often out of date. Use them for budgeting only, and confirm with the vendor.`),
-      el("p", { class: "v-gsearch" }, qs.map((q) =>
-        el("a", { class: "chip-link", href: "https://www.google.com/search?q=" + encodeURIComponent(q), target: "_blank", rel: "noopener" }, q))));
+      el("p", { class: "v-price-label" }, "Published prices vary a lot and are often out of date. Use them for budgeting only, and confirm with the vendor."),
+      el("p", null, el("a", { class: "btn-quiet btn-link", href: g(ask, true), target: "_blank", rel: "noopener" }, "Ask Google AI Mode")),
+      el("p", { class: "v-gsearch" }, "Or search: ", qs.map((q) =>
+        el("a", { class: "chip-link", href: g(q, false), target: "_blank", rel: "noopener" }, q))));
   }
 
   function checkVendorQuote(v, c) {
