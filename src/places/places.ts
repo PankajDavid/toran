@@ -37,7 +37,7 @@ export const SEARCH_TERMS: Record<string, string> = {
 export const FindVendorsSchema = z.strictObject({
   category: z.string().refine((k) => k in SEARCH_TERMS, "Unknown vendor category"),
   // City names only: letters, spaces, dots and hyphens (e.g. "Navi Mumbai", "S.A.S. Nagar").
-  city: z.string().trim().min(2).max(60).regex(/^[\p{L} .'-]+$/u, "City name only").optional(),
+  city: z.string().trim().min(2).max(60).regex(/^[\p{L} .'-]+$/u, "City name only").refine((c) => c.split(/\s+/).length <= 4, "City name only").optional(),
   // Rounded on the phone to 2 decimals (about 1 km) before it is sent.
   near: z.strictObject({ lat: z.number().min(6).max(37.5), lng: z.number().min(68).max(97.5) }).optional(),
 }).refine((b) => b.city || b.near, "Give a city or a location");

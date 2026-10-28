@@ -106,7 +106,8 @@ export function createGeminiClient(opts: GeminiOptions): AiClient {
           config: {
             systemInstruction: req.system,
             tools: [{ googleSearch: {} }],
-            thinkingConfig: { thinkingLevel: req.thinking === "minimal" ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW },
+            // No thinking override by default: low thinking made the model skip searching.
+            ...(req.thinking ? { thinkingConfig: { thinkingLevel: req.thinking === "minimal" ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW } } : {}),
             abortSignal: controller.signal,
           },
         });
