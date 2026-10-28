@@ -23,8 +23,9 @@ Live: https://toran.up.railway.app · Repo: github.com/PankajDavid/toran · Rail
 - The LLM may EXTRACT numbers the user stated or a document shows (e.g. "15 lakh", a quote line).
   Extracted values are always shown to the user for confirmation and re-validated by code.
 - The LLM never INVENTS amounts or dates. Creative text containing amounts is dropped.
-- Web prices only with a source URL returned by search grounding; shown as ranges, labelled
-  "for budgeting only, confirm with the vendor".
+- Toran never shows a web price itself. "Check prices online" opens Google searches built by code
+  (labelled "for budgeting only, confirm with the vendor"). AI search grounding was tried and
+  dropped: Gemini wouldn't reliably run the search, so answers had no sources (28 Oct logs).
 - Vendors are real Google Places listings or user-entered. NEVER invent vendor names, phones, businesses.
 - AI proposes actions; code checks them; the user approves each one before anything happens.
 
