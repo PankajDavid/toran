@@ -66,7 +66,10 @@ export function createGeminiClient(opts: GeminiOptions): AiClient {
 
   const upstream = (err: unknown) => {
     const e = err as { status?: number; message?: string };
-    const statusWord = /\b(NOT_FOUND|PERMISSION_DENIED|UNAUTHENTICATED|INVALID_ARGUMENT|RESOURCE_EXHAUSTED|FAILED_PRECONDITION|UNAVAILABLE)\b/.exec(e?.message ?? "")?.[1];
+    const statusWord =
+      /\b(NOT_FOUND|PERMISSION_DENIED|UNAUTHENTICATED|INVALID_ARGUMENT|RESOURCE_EXHAUSTED|FAILED_PRECONDITION|UNAVAILABLE)\b/.exec(
+        e?.message ?? "",
+      )?.[1];
     return new AiError("upstream", "AI request failed", [e?.status, statusWord].filter(Boolean).join(" ") || undefined);
   };
 
@@ -151,4 +154,3 @@ export function asData(label: string, text: string): AiPart {
   const safe = text.replace(/</g, "‹").replace(/>/g, "›");
   return { text: `<${label}>\n${safe}\n</${label}>` };
 }
-

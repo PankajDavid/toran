@@ -16,7 +16,11 @@ afterAll(() => new Promise<void>((r) => server.close(() => r())));
 
 const valid = { eventType: "birthday", subType: "kid", totalBudgetINR: 40_000, guestCount: 30, cityTier: 2, eventDate: "2026-11-20" };
 const post = (body: unknown, raw = false) =>
-  fetch(`${base}/api/plan`, { method: "POST", headers: { "content-type": "application/json" }, body: raw ? (body as string) : JSON.stringify(body) });
+  fetch(`${base}/api/plan`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: raw ? (body as string) : JSON.stringify(body),
+  });
 
 describe("HTTP API", () => {
   it("health check works", async () => {
@@ -27,9 +31,19 @@ describe("HTTP API", () => {
 
   it("interview works end to end without AI: one Hinglish sentence plus button taps", async () => {
     const turn = (body: unknown) =>
-      fetch(`${base}/api/interview`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+      fetch(`${base}/api/interview`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(
+        (r) => r.json(),
+      );
     let r = await turn({ text: "Beti ki shaadi hai 14 Feb ko, Ludhiana mein, 300 log, 15 lakh budget" });
-    expect(r.known).toMatchObject({ eventType: "wedding", eventDate: "2027-02-14", guestCount: 300, totalBudgetINR: 1_500_000, city: "Ludhiana", cityTier: 2, subType: "punjabi" });
+    expect(r.known).toMatchObject({
+      eventType: "wedding",
+      eventDate: "2027-02-14",
+      guestCount: 300,
+      totalBudgetINR: 1_500_000,
+      city: "Ludhiana",
+      cityTier: 2,
+      subType: "punjabi",
+    });
     expect(r.guessed).toContain("subType");
     expect(r.next.field).toBe("subEvents");
     r = await turn({ known: r.known, guessed: r.guessed, set: { subEvents: ["mehendi", "ceremony"] } });
@@ -60,7 +74,11 @@ describe("HTTP API", () => {
   });
 
   it("rejects malformed interview turns", async () => {
-    const res = await fetch(`${base}/api/interview`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: "x".repeat(600) }) });
+    const res = await fetch(`${base}/api/interview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "x".repeat(600) }),
+    });
     expect(res.status).toBe(400);
   });
 
@@ -123,8 +141,17 @@ describe("calendar endpoint", () => {
     const s = createApp({ today: () => "2026-10-28", ai: offlineClient }).listen(0);
     await new Promise((r) => s.once("listening", r));
     const base = `http://127.0.0.1:${(s.address() as import("node:net").AddressInfo).port}`;
-    const post = (body: unknown) => fetch(`${base}/api/calendar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    const ok = await post({ eventType: "birthday", subType: "kid", totalBudgetINR: 50_000, guestCount: 30, cityTier: 2, eventDate: "2026-12-20", done: [] });
+    const post = (body: unknown) =>
+      fetch(`${base}/api/calendar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const ok = await post({
+      eventType: "birthday",
+      subType: "kid",
+      totalBudgetINR: 50_000,
+      guestCount: 30,
+      cityTier: 2,
+      eventDate: "2026-12-20",
+      done: [],
+    });
     expect(ok.status).toBe(200);
     expect(ok.headers.get("content-type")).toContain("text/calendar");
     expect(await ok.text()).toContain("BEGIN:VEVENT");

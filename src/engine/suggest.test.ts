@@ -3,7 +3,15 @@ import { buildPlan } from "./plan.js";
 import { buildCalendar, foldLine, icsText } from "./ics.js";
 
 const TODAY = "2026-10-28";
-const wedding = { eventType: "wedding", subType: "punjabi", subEvents: ["ceremony"], totalBudgetINR: 20_00_000, guestCount: 250, cityTier: 2, eventDate: "2027-02-14" };
+const wedding = {
+  eventType: "wedding",
+  subType: "punjabi",
+  subEvents: ["ceremony"],
+  totalBudgetINR: 20_00_000,
+  guestCount: 250,
+  cityTier: 2,
+  eventDate: "2027-02-14",
+};
 const ids = (p: ReturnType<typeof buildPlan>) => p.suggestions.map((s) => s.id);
 
 describe("Toran suggests", () => {
@@ -33,11 +41,17 @@ describe("Toran suggests", () => {
     const soon = { ...wedding, eventDate: "2026-11-04" };
     const p = buildPlan(soon, TODAY, [{ taskId: "w-venue", agreedINR: 4_00_000, advanceINR: 1_00_000 }], ["w-venue"]);
     expect(p.suggestions.find((s) => s.id === "balance-due")?.title).toContain("₹3,00,000");
-    expect(ids(buildPlan(wedding, TODAY, [{ taskId: "w-venue", agreedINR: 4_00_000, advanceINR: 1_00_000 }], ["w-venue"]))).not.toContain("balance-due");
+    expect(ids(buildPlan(wedding, TODAY, [{ taskId: "w-venue", agreedINR: 4_00_000, advanceINR: 1_00_000 }], ["w-venue"]))).not.toContain(
+      "balance-due",
+    );
   });
   it("never invents an amount: every rupee figure comes from the plan", () => {
     const p = buildPlan(wedding, TODAY);
-    const allowed = new Set([...p.spending.lines.map((l) => l.plannedINR), p.spending.dueINR, p.spending.overBudgetINR, p.spending.unbookedPlannedINR].map((n) => `₹${n.toLocaleString("en-IN")}`));
+    const allowed = new Set(
+      [...p.spending.lines.map((l) => l.plannedINR), p.spending.dueINR, p.spending.overBudgetINR, p.spending.unbookedPlannedINR].map(
+        (n) => `₹${n.toLocaleString("en-IN")}`,
+      ),
+    );
     for (const s of p.suggestions) for (const m of `${s.title} ${s.why}`.match(/₹[\d,]+/g) ?? []) expect(allowed.has(m), m).toBe(true);
   });
 });
@@ -60,7 +74,7 @@ describe("calendar file", () => {
   });
   it("escapes text and folds long lines without breaking characters", () => {
     expect(icsText("a,b;c\\d\ne")).toBe(String.raw`a\,b\;c\\d\ne`);
-    const long = "SUMMARY:" + "मेहंदी ".repeat(30);
+    const long = `SUMMARY:${"मेहंदी ".repeat(30)}`;
     const folded = foldLine(long);
     for (const l of folded.split("\r\n")) expect(Buffer.byteLength(l, "utf8")).toBeLessThanOrEqual(75);
     expect(folded.split("\r\n ").join("")).toBe(long);

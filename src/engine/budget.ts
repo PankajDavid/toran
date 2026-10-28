@@ -1,10 +1,4 @@
-import {
-  ALLOCATIONS,
-  FOOD_FLOOR_PER_GUEST,
-  type CategoryShare,
-  type CityTier,
-  type EventType,
-} from "./config.js";
+import { ALLOCATIONS, FOOD_FLOOR_PER_GUEST, type CategoryShare, type CityTier, type EventType } from "./config.js";
 
 export interface BudgetLine {
   key: string;
@@ -49,9 +43,7 @@ export function splitExactly(totalINR: number, shares: readonly { bp: number }[]
 
   const base = shares.map((s) => Math.floor((totalINR * s.bp) / 10_000));
   let leftover = totalINR - base.reduce((a, b) => a + b, 0);
-  const order = shares
-    .map((s, i) => ({ i, frac: (totalINR * s.bp) % 10_000 }))
-    .sort((a, b) => b.frac - a.frac || a.i - b.i);
+  const order = shares.map((s, i) => ({ i, frac: (totalINR * s.bp) % 10_000 })).sort((a, b) => b.frac - a.frac || a.i - b.i);
   for (let k = 0; leftover > 0; k++, leftover--) base[order[k % order.length].i] += 1;
   return base;
 }

@@ -63,7 +63,10 @@ export function buildSuggestions(
     out.push({
       id: `task:${chore.id}`,
       title: chore.title,
-      why: chore.status === "late" ? `Ideally done by ${fmt(chore.idealDate)}. Tick it once it's done.` : `Due by ${fmt(chore.dueDate)}. Tick it once it's done.`,
+      why:
+        chore.status === "late"
+          ? `Ideally done by ${fmt(chore.idealDate)}. Tick it once it's done.`
+          : `Due by ${fmt(chore.dueDate)}. Tick it once it's done.`,
       button: "Mark as done",
       action: { type: "mark-done", taskId: chore.id },
     });
@@ -74,9 +77,10 @@ export function buildSuggestions(
     out.push({
       id: "over-budget",
       title: `You're ${inr(spending.overBudgetINR)} over budget`,
-      why: spending.unbookedPlannedINR > 0
-        ? `Bookings so far cost more than planned and the buffer is used up. ${inr(spending.unbookedPlannedINR)} is still to be booked: trimming those lines closes the gap.`
-        : "Everything is booked and the total is above your budget. Check the advance and balance for each vendor.",
+      why:
+        spending.unbookedPlannedINR > 0
+          ? `Bookings so far cost more than planned and the buffer is used up. ${inr(spending.unbookedPlannedINR)} is still to be booked: trimming those lines closes the gap.`
+          : "Everything is booked and the total is above your budget. Check the advance and balance for each vendor.",
       button: "Review budget",
       action: { type: "open-section", section: "budget-card" },
     });

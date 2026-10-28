@@ -122,36 +122,35 @@ export function createApp(opts: AppOptions = {}) {
    * Reads a quotation photo or PDF into a draft the user confirms.
    * The file lives only in memory for this request: never written to disk, never logged.
    */
-  app.post(
-    "/api/quote/read",
-    quoteLimiter,
-    express.raw({ type: [...QUOTE_MIME], limit: MAX_QUOTE_BYTES }),
-    async (req, res) => {
-      const body = req.body;
-      if (!Buffer.isBuffer(body) || body.length === 0) {
-        res.status(415).json({ error: "Please upload a photo (JPG, PNG, WebP) or a PDF of the quotation." });
-        return;
-      }
-      const claimed = String(req.headers["content-type"] ?? "").split(";")[0].trim();
-      const actual = sniffMime(body);
-      if (!actual || actual !== claimed) {
-        res.status(415).json({ error: "That file doesn't look like a photo or PDF. Please try another." });
-        return;
-      }
-      if (!ai.available) {
-        res.status(503).json({ error: "Reading quotes needs the AI, which is offline right now. You can type the lines in instead.", manual: true });
-        return;
-      }
-      try {
-        const result = await readQuote(body, actual as QuoteMime, ai);
-        res.json(result);
-      } catch (err) {
-        const e = err as { kind?: string; detail?: string };
-        console.warn(`Quote read failed (${e.kind ?? "error"}${e.detail ? ` ${e.detail}` : ""})`);
-        res.status(502).json({ error: "Couldn't read this quotation. Try a clearer, well-lit photo, or type the lines in.", manual: true });
-      }
-    },
-  );
+  app.post("/api/quote/read", quoteLimiter, express.raw({ type: [...QUOTE_MIME], limit: MAX_QUOTE_BYTES }), async (req, res) => {
+    const body = req.body;
+    if (!Buffer.isBuffer(body) || body.length === 0) {
+      res.status(415).json({ error: "Please upload a photo (JPG, PNG, WebP) or a PDF of the quotation." });
+      return;
+    }
+    const claimed = String(req.headers["content-type"] ?? "")
+      .split(";")[0]
+      .trim();
+    const actual = sniffMime(body);
+    if (!actual || actual !== claimed) {
+      res.status(415).json({ error: "That file doesn't look like a photo or PDF. Please try another." });
+      return;
+    }
+    if (!ai.available) {
+      res
+        .status(503)
+        .json({ error: "Reading quotes needs the AI, which is offline right now. You can type the lines in instead.", manual: true });
+      return;
+    }
+    try {
+      const result = await readQuote(body, actual as QuoteMime, ai);
+      res.json(result);
+    } catch (err) {
+      const e = err as { kind?: string; detail?: string };
+      console.warn(`Quote read failed (${e.kind ?? "error"}${e.detail ? ` ${e.detail}` : ""})`);
+      res.status(502).json({ error: "Couldn't read this quotation. Try a clearer, well-lit photo, or type the lines in.", manual: true });
+    }
+  });
 
   const CheckBody = z.strictObject({
     quote: QuoteSchema,
@@ -230,14 +229,22 @@ export function createApp(opts: AppOptions = {}) {
     message: { error: "Too many requests. Please wait a minute and try again." },
   });
 
-  const EVENT_TITLE: Record<string, string> = { wedding: "Wedding", birthday: "Birthday", party: "Get-together", community: "Community event" };
+  const EVENT_TITLE: Record<string, string> = {
+    wedding: "Wedding",
+    birthday: "Birthday",
+    party: "Get-together",
+    community: "Community event",
+  };
 
   /** The plan's open deadlines and event day as a calendar file. Built by code; nothing is stored. */
   app.post("/api/calendar", planLimiter, (req, res) => {
     try {
       const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? { ...req.body } : req.body;
       const done = body && typeof body === "object" && "done" in body ? body.done : [];
-      if (body && typeof body === "object") { delete body.done; delete body.deals; }
+      if (body && typeof body === "object") {
+        delete body.done;
+        delete body.deals;
+      }
       const plan = buildPlan(body, today(), [], done);
       const doneSet = new Set(Array.isArray(done) ? done.filter((x: unknown) => typeof x === "string") : []);
       const ics = buildCalendar(plan.timeline, { title: `${EVENT_TITLE[plan.input.eventType]} (Toran)`, done: doneSet, stamp: new Date() });
@@ -259,7 +266,10 @@ export function createApp(opts: AppOptions = {}) {
       const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? { ...req.body } : req.body;
       const deals = body && typeof body === "object" && "deals" in body ? body.deals : [];
       const done = body && typeof body === "object" && "done" in body ? body.done : [];
-      if (body && typeof body === "object") { delete body.deals; delete body.done; }
+      if (body && typeof body === "object") {
+        delete body.deals;
+        delete body.done;
+      }
       res.json(buildPlan(body, today(), deals, done));
     } catch (err) {
       if (err instanceof PlanInputError) {

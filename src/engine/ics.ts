@@ -35,11 +35,11 @@ const nextDay = (iso: string) => {
   return d.toISOString().slice(0, 10);
 };
 
-export function buildCalendar(
-  timeline: TimelineResult,
-  opts: { title: string; done: ReadonlySet<string>; stamp: Date },
-): string {
-  const stamp = opts.stamp.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+export function buildCalendar(timeline: TimelineResult, opts: { title: string; done: ReadonlySet<string>; stamp: Date }): string {
+  const stamp = opts.stamp
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -69,9 +69,14 @@ export function buildCalendar(
   };
   for (const t of timeline.tasks) {
     if (opts.done.has(t.id)) continue;
-    event(`${t.id}-${timeline.eventDate}`, t.dueDate, t.title, `${opts.title}: ${t.daysBeforeEvent} days before the event. From your Toran plan.`);
+    event(
+      `${t.id}-${timeline.eventDate}`,
+      t.dueDate,
+      t.title,
+      `${opts.title}: ${t.daysBeforeEvent} days before the event. From your Toran plan.`,
+    );
   }
   event(`event-${timeline.eventDate}`, timeline.eventDate, opts.title, "The big day. Every celebration, sorted.");
   lines.push("END:VCALENDAR");
-  return lines.map(foldLine).join("\r\n") + "\r\n";
+  return `${lines.map(foldLine).join("\r\n")}\r\n`;
 }

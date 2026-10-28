@@ -181,7 +181,8 @@ export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
       code: "GST_EXTRA",
       severity: "warning",
       message: `GST is extra. At ${num(gstRatePct)}%${q.gst.ratePct === undefined ? " (assumed)" : ""}, that's ${inr(gstINR)} more: you'd pay ${inr(computed)}, not ${inr(baseINR)}.`,
-      question: q.gst.ratePct === undefined ? "GST is mentioned as extra. Which GST rate applies, and will you give a GST invoice?" : undefined,
+      question:
+        q.gst.ratePct === undefined ? "GST is mentioned as extra. Which GST rate applies, and will you give a GST invoice?" : undefined,
     });
     if (q.totalINR !== undefined && Math.abs(q.totalINR - computed) > 1 && q.gst.amountINR !== undefined) {
       add({
@@ -217,7 +218,9 @@ export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
   }
 
   // 4. Minimum guarantee vs guest count.
-  const perGuest = q.lines.find((l) => l.rate !== undefined && ((l.unit && PER_GUEST_UNIT.test(l.unit)) || PER_GUEST_UNIT.test(l.description)));
+  const perGuest = q.lines.find(
+    (l) => l.rate !== undefined && ((l.unit && PER_GUEST_UNIT.test(l.unit)) || PER_GUEST_UNIT.test(l.description)),
+  );
   if (q.minimumGuarantee && q.minimumGuarantee.quantity > ctx.guestCount) {
     const extra = q.minimumGuarantee.quantity - ctx.guestCount;
     const cost = perGuest?.rate !== undefined ? Math.round(extra * perGuest.rate) : null;
@@ -241,7 +244,8 @@ export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
 
   // 6. Items usually expected: covered, excluded ("to be arranged by party"), or not mentioned at all.
   const segments = [...q.lines.map((l) => l.description), ...(q.notes ?? [])];
-  const EXCLUDED = /arranged\s+by\s+(the\s+)?(party|client|customer|host|you)|by\s+(the\s+)?(party|client|customer)|not\s+included|excluded|exclusive\s+of|excluding|\bextra\b|chargeable|charged\s+separately|own\s+arrangement/i;
+  const EXCLUDED =
+    /arranged\s+by\s+(the\s+)?(party|client|customer|host|you)|by\s+(the\s+)?(party|client|customer)|not\s+included|excluded|exclusive\s+of|excluding|\bextra\b|chargeable|charged\s+separately|own\s+arrangement/i;
   const missing: string[] = [];
   const excluded: string[] = [];
   for (const e of EXPECTED[q.category] ?? []) {
@@ -274,13 +278,18 @@ export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
     if (budgetGapINR > 0) {
       add({ code: "OVER_PLAN", severity: "warning", message: `${inr(budgetGapINR)} over your plan of ${inr(ctx.plannedINR)} for this.` });
     } else {
-      add({ code: "WITHIN_PLAN", severity: "good", message: `Within your plan of ${inr(ctx.plannedINR)}${budgetGapINR < 0 ? `, with ${inr(-budgetGapINR)} to spare` : ""}.` });
+      add({
+        code: "WITHIN_PLAN",
+        severity: "good",
+        message: `Within your plan of ${inr(ctx.plannedINR)}${budgetGapINR < 0 ? `, with ${inr(-budgetGapINR)} to spare` : ""}.`,
+      });
     }
   }
 
   // 8. Payment terms.
   const advancePct =
-    q.advance?.percent ?? (q.advance?.amountINR !== undefined && trueTotalINR > 0 ? Math.round((q.advance.amountINR / trueTotalINR) * 100) : undefined);
+    q.advance?.percent ??
+    (q.advance?.amountINR !== undefined && trueTotalINR > 0 ? Math.round((q.advance.amountINR / trueTotalINR) * 100) : undefined);
   if (advancePct !== undefined && advancePct > 50) {
     add({
       code: "HIGH_ADVANCE",
@@ -308,8 +317,12 @@ export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
   if (overcharge !== 0) {
     const fixedBase = baseINR - overcharge;
     correctedTotalINR =
-      q.gst.status === "extra" ? fixedBase + (q.gst.amountINR !== undefined ? Math.round((q.gst.amountINR * fixedBase) / Math.max(1, baseINR)) : Math.round((fixedBase * gstRatePct) / 100))
-      : trueTotalINR - overcharge;
+      q.gst.status === "extra"
+        ? fixedBase +
+          (q.gst.amountINR !== undefined
+            ? Math.round((q.gst.amountINR * fixedBase) / Math.max(1, baseINR))
+            : Math.round((fixedBase * gstRatePct) / 100))
+        : trueTotalINR - overcharge;
   }
 
   const questions = findings.map((f) => f.question).filter((x): x is string => !!x);

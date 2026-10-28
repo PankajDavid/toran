@@ -28,9 +28,7 @@ export function buildPlan(raw: unknown, today: string, rawDeals: unknown = [], r
   const input = parsePlanInput(raw, today);
   const dealsResult = DealsSchema.safeParse(rawDeals ?? []);
   if (!dealsResult.success) {
-    throw new PlanInputError(
-      dealsResult.error.issues.map((i) => ({ field: ["deals", ...i.path].join("."), message: i.message })),
-    );
+    throw new PlanInputError(dealsResult.error.issues.map((i) => ({ field: ["deals", ...i.path].join("."), message: i.message })));
   }
   // Selectors decide which optional tasks/vendors apply: the sub-type plus any wedding functions.
   const selectors = [input.subType, ...(input.eventType === "wedding" ? input.subEvents : [])];

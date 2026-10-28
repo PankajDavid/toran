@@ -1,16 +1,24 @@
 // Toran service worker: lets the app open fast and work offline, and makes it installable.
 // Network first, so updates always arrive; the cache is only a fallback.
 // API calls are never cached (plans are built fresh and never stored here).
-const CACHE = "toran-v14";
+const CACHE = "toran-v15";
 const SHELL = ["/", "/app.js", "/app.css", "/favicon.svg", "/brand/toran-garland.svg", "/manifest.webmanifest", "/icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches
+      .open(CACHE)
+      .then((c) => c.addAll(SHELL))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()),
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
   );
 });
 

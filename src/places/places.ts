@@ -11,13 +11,22 @@ import { z } from "zod";
 export { SEARCH_TERMS } from "../engine/vendors.js";
 import { SEARCH_TERMS } from "../engine/vendors.js";
 
-export const FindVendorsSchema = z.strictObject({
-  category: z.string().refine((k) => k in SEARCH_TERMS, "Unknown vendor category"),
-  // City names only: letters, spaces, dots and hyphens (e.g. "Navi Mumbai", "S.A.S. Nagar").
-  city: z.string().trim().min(2).max(60).regex(/^[\p{L} .'-]+$/u, "City name only").refine((c) => c.split(/\s+/).length <= 4, "City name only").optional(),
-  // Rounded on the phone to 2 decimals (about 1 km) before it is sent.
-  near: z.strictObject({ lat: z.number().min(6).max(37.5), lng: z.number().min(68).max(97.5) }).optional(),
-}).refine((b) => b.city || b.near, "Give a city or a location");
+export const FindVendorsSchema = z
+  .strictObject({
+    category: z.string().refine((k) => k in SEARCH_TERMS, "Unknown vendor category"),
+    // City names only: letters, spaces, dots and hyphens (e.g. "Navi Mumbai", "S.A.S. Nagar").
+    city: z
+      .string()
+      .trim()
+      .min(2)
+      .max(60)
+      .regex(/^[\p{L} .'-]+$/u, "City name only")
+      .refine((c) => c.split(/\s+/).length <= 4, "City name only")
+      .optional(),
+    // Rounded on the phone to 2 decimals (about 1 km) before it is sent.
+    near: z.strictObject({ lat: z.number().min(6).max(37.5), lng: z.number().min(68).max(97.5) }).optional(),
+  })
+  .refine((b) => b.city || b.near, "Give a city or a location");
 export type FindVendorsRequest = z.infer<typeof FindVendorsSchema>;
 
 export interface FoundVendor {
@@ -37,14 +46,24 @@ export interface PlacesClient {
 }
 
 export class PlacesError extends Error {
-  constructor(public readonly kind: "unavailable" | "timeout" | "upstream", public readonly detail?: string) {
+  constructor(
+    public readonly kind: "unavailable" | "timeout" | "upstream",
+    public readonly detail?: string,
+  ) {
     super(`places ${kind}`);
   }
 }
 
 const FIELD_MASK = [
-  "places.id", "places.displayName", "places.formattedAddress", "places.nationalPhoneNumber",
-  "places.rating", "places.userRatingCount", "places.googleMapsUri", "places.websiteUri", "places.businessStatus",
+  "places.id",
+  "places.displayName",
+  "places.formattedAddress",
+  "places.nationalPhoneNumber",
+  "places.rating",
+  "places.userRatingCount",
+  "places.googleMapsUri",
+  "places.websiteUri",
+  "places.businessStatus",
 ].join(",");
 
 const clean = (s: string, max: number) => s.replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -63,7 +82,8 @@ const PlaceSchema = z.object({
 
 /** Keeps only open businesses with a valid Google Maps link; drops anything malformed. */
 export function sanitizePlaces(raw: unknown): FoundVendor[] {
-  const list = raw && typeof raw === "object" && Array.isArray((raw as { places?: unknown }).places) ? (raw as { places: unknown[] }).places : [];
+  const list =
+    raw && typeof raw === "object" && Array.isArray((raw as { places?: unknown }).places) ? (raw as { places: unknown[] }).places : [];
   const out: FoundVendor[] = [];
   for (const p of list.slice(0, 20)) {
     const r = PlaceSchema.safeParse(p);
@@ -71,11 +91,20 @@ export function sanitizePlaces(raw: unknown): FoundVendor[] {
     const v = r.data;
     if (v.businessStatus && v.businessStatus !== "OPERATIONAL") continue;
     let maps: URL;
-    try { maps = new URL(v.googleMapsUri); } catch { continue; }
+    try {
+      maps = new URL(v.googleMapsUri);
+    } catch {
+      continue;
+    }
     if (maps.protocol !== "https:" || !/(^|\.)google\.[a-z.]+$|(^|\.)goo\.gl$/.test(maps.hostname)) continue;
     let website: string | undefined;
     if (v.websiteUri) {
-      try { const w = new URL(v.websiteUri); if (w.protocol === "https:" || w.protocol === "http:") website = w.href.slice(0, 300); } catch { /* drop */ }
+      try {
+        const w = new URL(v.websiteUri);
+        if (w.protocol === "https:" || w.protocol === "http:") website = w.href.slice(0, 300);
+      } catch {
+        /* drop */
+      }
     }
     const phone = v.nationalPhoneNumber && /^[\d +()-]{6,20}$/.test(v.nationalPhoneNumber) ? v.nationalPhoneNumber : undefined;
     out.push({
@@ -101,7 +130,9 @@ export function searchText(req: FindVendorsRequest): string {
 
 export const offlinePlaces: PlacesClient = {
   available: false,
-  async search() { throw new PlacesError("unavailable"); },
+  async search() {
+    throw new PlacesError("unavailable");
+  },
 };
 
 export function createPlacesClient(apiKey: string, fetchImpl: typeof fetch = fetch): PlacesClient {

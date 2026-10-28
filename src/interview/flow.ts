@@ -23,10 +23,22 @@ export interface Question {
   placeholder?: string;
 }
 
-const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 const lakh = (n: number) => n * 100_000;
-const fmtINR = (n: number) =>
-  n >= 1e7 ? `₹${n / 1e7} crore` : n >= 1e5 ? `₹${n / 1e5} lakh` : `₹${n.toLocaleString("en-IN")}`;
+const fmtINR = (n: number) => (n >= 1e7 ? `₹${n / 1e7} crore` : n >= 1e5 ? `₹${n / 1e5} lakh` : `₹${n.toLocaleString("en-IN")}`);
 
 const GUEST_PRESETS: Record<EventType, number[]> = {
   wedding: [150, 300, 500, 800],
@@ -45,19 +57,39 @@ const BUDGET_PRESETS: Record<EventType, number[]> = {
 const SUB_TYPE_QUESTIONS: Record<EventType, { text: string; options: [string, string][] }> = {
   wedding: {
     text: "Which style of wedding?",
-    options: [["Punjabi", "punjabi"], ["South Indian", "south-indian"], ["Bengali", "bengali"], ["Christian", "christian"], ["Other", "other"]],
+    options: [
+      ["Punjabi", "punjabi"],
+      ["South Indian", "south-indian"],
+      ["Bengali", "bengali"],
+      ["Christian", "christian"],
+      ["Other", "other"],
+    ],
   },
   birthday: {
     text: "Whose birthday is it?",
-    options: [["A child's", "kid"], ["An adult's", "adult"], ["A milestone (25th, 50th, 60th…)", "milestone"]],
+    options: [
+      ["A child's", "kid"],
+      ["An adult's", "adult"],
+      ["A milestone (25th, 50th, 60th…)", "milestone"],
+    ],
   },
   party: {
     text: "What kind of get-together?",
-    options: [["Kitty party", "kitty"], ["Anniversary", "anniversary"], ["Something else", "other"]],
+    options: [
+      ["Kitty party", "kitty"],
+      ["Anniversary", "anniversary"],
+      ["Something else", "other"],
+    ],
   },
   community: {
     text: "What kind of community event?",
-    options: [["Jagran", "jagran"], ["Langar", "langar"], ["Diwali mela", "diwali-mela"], ["Society / RWA function", "rwa-function"], ["Something else", "other"]],
+    options: [
+      ["Jagran", "jagran"],
+      ["Langar", "langar"],
+      ["Diwali mela", "diwali-mela"],
+      ["Society / RWA function", "rwa-function"],
+      ["Something else", "other"],
+    ],
   },
 };
 
@@ -66,7 +98,7 @@ export const FIRST_QUESTION: Question = {
   text: "Namaste! What are we planning?",
   mode: "single",
   input: "text",
-  placeholder: "Or tell me in your own words, e.g. \"Beti ki shaadi, Feb mein, 300 log, 15 lakh\"",
+  placeholder: 'Or tell me in your own words, e.g. "Beti ki shaadi, Feb mein, 300 log, 15 lakh"',
   options: [
     { label: "Wedding", set: { eventType: "wedding" } },
     { label: "Birthday", set: { eventType: "birthday" } },
@@ -103,7 +135,11 @@ export function nextQuestion(k: Known): Question | null {
       mode: "multi",
       input: "none",
       options: [
-        ["Haldi", "haldi"], ["Mehendi", "mehendi"], ["Sangeet", "sangeet"], ["Ceremony", "ceremony"], ["Reception", "reception"],
+        ["Haldi", "haldi"],
+        ["Mehendi", "mehendi"],
+        ["Sangeet", "sangeet"],
+        ["Ceremony", "ceremony"],
+        ["Reception", "reception"],
       ].map(([label, value]) => ({ label, set: { subEvents: [value] } })),
     };
   }

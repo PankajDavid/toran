@@ -64,9 +64,7 @@ export class PlanInputError extends Error {
 export function parsePlanInput(raw: unknown, today: string): PlanInput {
   const result = inputSchema.safeParse(raw);
   if (!result.success) {
-    throw new PlanInputError(
-      result.error.issues.map((i) => ({ field: i.path.join(".") || "input", message: i.message })),
-    );
+    throw new PlanInputError(result.error.issues.map((i) => ({ field: i.path.join(".") || "input", message: i.message })));
   }
   const input = result.data;
   if (input.eventDate < today) {

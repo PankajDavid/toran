@@ -7,7 +7,19 @@ import { EVENT_TYPES, SUB_TYPES } from "../engine/config.js";
 
 const TODAY = "2026-10-27";
 const plan = (extra: object = {}) =>
-  parsePlanInput({ eventType: "wedding", subType: "punjabi", subEvents: ["sangeet", "ceremony"], totalBudgetINR: 20_00_000, guestCount: 400, cityTier: 2, eventDate: "2027-02-14", ...extra }, TODAY);
+  parsePlanInput(
+    {
+      eventType: "wedding",
+      subType: "punjabi",
+      subEvents: ["sangeet", "ceremony"],
+      totalBudgetINR: 20_00_000,
+      guestCount: 400,
+      cityTier: 2,
+      eventDate: "2027-02-14",
+      ...extra,
+    },
+    TODAY,
+  );
 
 const goodAi = {
   themes: [{ name: "Phulkari Bloom", colours: ["marigold", "pink"], description: "Bright drapes and marigolds." }],
@@ -26,7 +38,11 @@ describe("sanitizeIdeas — code checks on AI ideas", () => {
 
   it("removes anything mentioning money", () => {
     const r = sanitizeIdeas(
-      { ...goodAi, decor: ["Marigold arch for ₹25,000", "Flowers worth 2 lakh", "Rs 500 per plate starters", "Fairy lights"], tips: ["Keep 50k aside"] },
+      {
+        ...goodAi,
+        decor: ["Marigold arch for ₹25,000", "Flowers worth 2 lakh", "Rs 500 per plate starters", "Fairy lights"],
+        tips: ["Keep 50k aside"],
+      },
       "non-veg",
     )!;
     expect(r.ideas.decor).toEqual(["Fairy lights"]);
@@ -40,7 +56,10 @@ describe("sanitizeIdeas — code checks on AI ideas", () => {
   });
 
   it("removes onion, garlic and root vegetables for a Jain event", () => {
-    const r = sanitizeIdeas({ ...goodAi, menu: [{ course: "Mains", items: ["Aloo gobi", "Garlic naan", "Paneer tikka", "Onion pakoda"] }] }, "jain")!;
+    const r = sanitizeIdeas(
+      { ...goodAi, menu: [{ course: "Mains", items: ["Aloo gobi", "Garlic naan", "Paneer tikka", "Onion pakoda"] }] },
+      "jain",
+    )!;
     expect(r.ideas.menu[0].items).toEqual(["Paneer tikka"]);
   });
 
@@ -92,7 +111,16 @@ describe("offline ideas", () => {
       for (const subType of SUB_TYPES[eventType]) {
         for (const diet of ["veg", "jain", "non-veg", "mixed"] as const) {
           const input = parsePlanInput(
-            { eventType, subType, ...(eventType === "wedding" ? { subEvents: ["ceremony"] } : {}), totalBudgetINR: 50_000, guestCount: 50, cityTier: 2, eventDate: "2027-01-10", diet },
+            {
+              eventType,
+              subType,
+              ...(eventType === "wedding" ? { subEvents: ["ceremony"] } : {}),
+              totalBudgetINR: 50_000,
+              guestCount: 50,
+              cityTier: 2,
+              eventDate: "2027-01-10",
+              diet,
+            },
             TODAY,
           );
           const ideas = offlineIdeas(input);

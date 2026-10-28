@@ -3,8 +3,14 @@ import { buildPlan, EVENT_TYPES, PlanInputError, SUB_TYPES, WEDDING_SUB_EVENTS }
 
 const TODAY = "2026-10-27";
 const wedding = {
-  eventType: "wedding", subType: "punjabi", subEvents: ["mehendi", "ceremony"],
-  totalBudgetINR: 15_00_000, guestCount: 300, cityTier: 2, eventDate: "2027-02-14", diet: "veg",
+  eventType: "wedding",
+  subType: "punjabi",
+  subEvents: ["mehendi", "ceremony"],
+  totalBudgetINR: 15_00_000,
+  guestCount: 300,
+  cityTier: 2,
+  eventDate: "2027-02-14",
+  diet: "veg",
 };
 // Planned: venue ₹3,00,000 (20%), catering ₹4,20,000 (28%), contingency ₹75,000 (5%), beauty ₹60,000 (4%).
 
@@ -20,7 +26,10 @@ describe("booking tasks link to budget lines", () => {
 
   it("never links a task to a budget line the event doesn't have", () => {
     for (const sub of ["jagran", "langar", "diwali-mela", "rwa-function", "other"]) {
-      const plan = buildPlan({ eventType: "community", subType: sub, totalBudgetINR: 2_00_000, guestCount: 300, cityTier: 2, eventDate: "2027-01-10" }, TODAY);
+      const plan = buildPlan(
+        { eventType: "community", subType: sub, totalBudgetINR: 2_00_000, guestCount: 300, cityTier: 2, eventDate: "2027-01-10" },
+        TODAY,
+      );
       const keys = new Set(plan.budget.lines.map((l) => l.key));
       for (const t of plan.timeline.tasks) if (t.books) expect(keys.has(t.books)).toBe(true);
     }
@@ -32,11 +41,27 @@ describe("every budget line has a timeline task that books it", () => {
   it.each(
     EVENT_TYPES.flatMap((eventType) =>
       SUB_TYPES[eventType].flatMap((subType) =>
-        eventType === "wedding" ? [[eventType, subType, [...WEDDING_SUB_EVENTS]], [eventType, subType, ["ceremony"]]] : [[eventType, subType, []]],
+        eventType === "wedding"
+          ? [
+              [eventType, subType, [...WEDDING_SUB_EVENTS]],
+              [eventType, subType, ["ceremony"]],
+            ]
+          : [[eventType, subType, []]],
       ),
     ) as [string, string, string[]][],
   )("%s / %s %j", (eventType, subType, subEvents) => {
-    const plan = buildPlan({ eventType, subType, ...(eventType === "wedding" ? { subEvents } : {}), totalBudgetINR: 5_00_000, guestCount: 200, cityTier: 2, eventDate: "2027-06-01" }, TODAY);
+    const plan = buildPlan(
+      {
+        eventType,
+        subType,
+        ...(eventType === "wedding" ? { subEvents } : {}),
+        totalBudgetINR: 5_00_000,
+        guestCount: 200,
+        cityTier: 2,
+        eventDate: "2027-06-01",
+      },
+      TODAY,
+    );
     const booked = new Set(plan.timeline.tasks.map((t) => t.books).filter(Boolean));
     const missing = plan.budget.lines.filter((l) => l.key !== "contingency" && !booked.has(l.key)).map((l) => l.key);
     expect(missing).toEqual([]);
@@ -51,22 +76,53 @@ describe("warnings stay relevant after bookings", () => {
     expect(booked.warnings.map((w) => w.code)).not.toContain("FOOD_BELOW_FLOOR");
   });
   it("says the overspend is final when everything is booked", () => {
-    const all = buildPlan(party, TODAY).budget.lines.filter((l) => l.key !== "contingency").map((l) => ({ lineKey: l.key, agreedINR: l.amountINR + 500, advanceINR: 0 }));
+    const all = buildPlan(party, TODAY)
+      .budget.lines.filter((l) => l.key !== "contingency")
+      .map((l) => ({ lineKey: l.key, agreedINR: l.amountINR + 500, advanceINR: 0 }));
     const msg = buildPlan(party, TODAY, all).warnings.find((w) => w.code === "OVER_BUDGET")!.message;
     expect(msg).toContain("Everything is booked");
   });
 });
 
 describe("vendor categories link to budget lines", () => {
-  const SERVICE_LINES = ["venue", "catering", "decor", "photo-video", "entertainment", "sound-lighting", "performers", "beauty", "stalls", "cooking", "utensils", "logistics"];
+  const SERVICE_LINES = [
+    "venue",
+    "catering",
+    "decor",
+    "photo-video",
+    "entertainment",
+    "sound-lighting",
+    "performers",
+    "beauty",
+    "stalls",
+    "cooking",
+    "utensils",
+    "logistics",
+  ];
   it.each(
     EVENT_TYPES.flatMap((eventType) =>
       SUB_TYPES[eventType].flatMap((subType) =>
-        eventType === "wedding" ? [[eventType, subType, [...WEDDING_SUB_EVENTS]], [eventType, subType, ["ceremony"]]] : [[eventType, subType, []]],
+        eventType === "wedding"
+          ? [
+              [eventType, subType, [...WEDDING_SUB_EVENTS]],
+              [eventType, subType, ["ceremony"]],
+            ]
+          : [[eventType, subType, []]],
       ),
     ) as [string, string, string[]][],
   )("%s / %s %j: every service line has a vendor, and every link is real", (eventType, subType, subEvents) => {
-    const plan = buildPlan({ eventType, subType, ...(eventType === "wedding" ? { subEvents } : {}), totalBudgetINR: 5_00_000, guestCount: 200, cityTier: 2, eventDate: "2027-06-01" }, TODAY);
+    const plan = buildPlan(
+      {
+        eventType,
+        subType,
+        ...(eventType === "wedding" ? { subEvents } : {}),
+        totalBudgetINR: 5_00_000,
+        guestCount: 200,
+        cityTier: 2,
+        eventDate: "2027-06-01",
+      },
+      TODAY,
+    );
     const lineKeys = new Set(plan.budget.lines.map((l) => l.key));
     for (const v of plan.vendors) if (v.line) expect(lineKeys.has(v.line)).toBe(true);
     const covered = new Set(plan.vendors.map((v) => v.line).filter(Boolean));
@@ -168,7 +224,15 @@ describe("reconcileBudget — deal closed", () => {
   });
 
   it("records a cost directly on a budget line (without ticking a task)", () => {
-    const anniv = { eventType: "party", subType: "anniversary", totalBudgetINR: 1_00_000, guestCount: 50, cityTier: 2, eventDate: "2027-01-10", diet: "veg" };
+    const anniv = {
+      eventType: "party",
+      subType: "anniversary",
+      totalBudgetINR: 1_00_000,
+      guestCount: 50,
+      cityTier: 2,
+      eventDate: "2027-01-10",
+      diet: "veg",
+    };
     const plan = buildPlan(anniv, TODAY);
     expect(plan.timeline.tasks.some((t) => t.books === "photo-video")).toBe(true); // the gap Pankaj found is now closed
     const s = buildPlan(anniv, TODAY, [{ lineKey: "photo-video", agreedINR: 2_000, advanceINR: 500 }]).spending;
@@ -186,7 +250,14 @@ describe("reconcileBudget — deal closed", () => {
   });
 
   it("flags the same amount entered via the timeline and as a line cost (Pankaj's Diwali mela case)", () => {
-    const mela = { eventType: "community", subType: "diwali-mela", totalBudgetINR: 3_00_000, guestCount: 800, cityTier: 2, eventDate: "2027-01-10" };
+    const mela = {
+      eventType: "community",
+      subType: "diwali-mela",
+      totalBudgetINR: 3_00_000,
+      guestCount: 800,
+      cityTier: 2,
+      eventDate: "2027-01-10",
+    };
     const s = buildPlan(mela, TODAY, [
       { taskId: "c-venue", agreedINR: 60_000, advanceINR: 20_000 },
       { lineKey: "venue", agreedINR: 60_000, advanceINR: 20_000 },

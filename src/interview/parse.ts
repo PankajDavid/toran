@@ -66,13 +66,15 @@ function parseDate(t: string, today: string): { eventDate?: string; eventMonth?:
   }
 
   m = t.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s*(?:of\\s+)?(${MONTH_ALT})\\b(?:\\s*,?\\s*(\\d{4}))?`));
-  if (m) {
-    const d = resolveDate(Number(m[1]), monthOf(m[2])!, m[3] ? Number(m[3]) : undefined, today);
+  const month1 = m ? monthOf(m[2]) : undefined;
+  if (m && month1) {
+    const d = resolveDate(Number(m[1]), month1, m[3] ? Number(m[3]) : undefined, today);
     if (d) return { eventDate: d };
   }
   m = t.match(new RegExp(`\\b(${MONTH_ALT})\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?:\\s*,?\\s*(\\d{4}))?`));
-  if (m) {
-    const d = resolveDate(Number(m[2]), monthOf(m[1])!, m[3] ? Number(m[3]) : undefined, today);
+  const month2 = m ? monthOf(m[1]) : undefined;
+  if (m && month2) {
+    const d = resolveDate(Number(m[2]), month2, m[3] ? Number(m[3]) : undefined, today);
     if (d) return { eventDate: d };
   }
 
@@ -87,12 +89,39 @@ function parseDate(t: string, today: string): { eventDate?: string; eventMonth?:
 }
 
 const UNIT: Record<string, number> = {
-  crore: 1e7, crores: 1e7, cr: 1e7, karod: 1e7, karor: 1e7,
-  lakh: 1e5, lakhs: 1e5, lac: 1e5, lacs: 1e5, lakh_: 1e5, l: 1e5,
-  k: 1e3, thousand: 1e3, hazaar: 1e3, hazar: 1e3, hajar: 1e3,
+  crore: 1e7,
+  crores: 1e7,
+  cr: 1e7,
+  karod: 1e7,
+  karor: 1e7,
+  lakh: 1e5,
+  lakhs: 1e5,
+  lac: 1e5,
+  lacs: 1e5,
+  lakh_: 1e5,
+  l: 1e5,
+  k: 1e3,
+  thousand: 1e3,
+  hazaar: 1e3,
+  hazar: 1e3,
+  hajar: 1e3,
 };
 const UNIT_ALT = "crores?|cr|karod|karor|lakhs?|lacs?|l|k|thousand|hazaar|hazar|hajar";
-const WORD_NUM: Record<string, number> = { sava: 1.25, dedh: 1.5, derh: 1.5, dhai: 2.5, adha: 0.5, aadha: 0.5, ek: 1, do: 2, teen: 3, char: 4, paanch: 5, panch: 5, das: 10 };
+const WORD_NUM: Record<string, number> = {
+  sava: 1.25,
+  dedh: 1.5,
+  derh: 1.5,
+  dhai: 2.5,
+  adha: 0.5,
+  aadha: 0.5,
+  ek: 1,
+  do: 2,
+  teen: 3,
+  char: 4,
+  paanch: 5,
+  panch: 5,
+  das: 10,
+};
 
 const GUEST_WORDS = "log|logon|logo|guests?|people|persons?|pax|mehmaan|mehman|members|bande|admi|janta|families";
 
@@ -148,25 +177,97 @@ const SUB_EVENT_RULES: [RegExp, string][] = [
 
 /** Common Indian cities with a tier: 1 = metro, 2 = large city. Unlisted cities are asked about. */
 export const CITY_TIERS: Record<string, CityTier> = {
-  delhi: 1, "new delhi": 1, mumbai: 1, bombay: 1, "navi mumbai": 1, thane: 1, bengaluru: 1, bangalore: 1,
-  chennai: 1, madras: 1, kolkata: 1, calcutta: 1, hyderabad: 1, pune: 1, ahmedabad: 1,
-  gurugram: 1, gurgaon: 1, noida: 1, ghaziabad: 1, faridabad: 1,
-  chandigarh: 2, panchkula: 2, mohali: 2, zirakpur: 2, ludhiana: 2, amritsar: 2, jalandhar: 2, patiala: 2,
-  ambala: 2, karnal: 2, panipat: 2, shimla: 2, jammu: 2, srinagar: 2, dehradun: 2, jaipur: 2, jodhpur: 2,
-  udaipur: 2, lucknow: 2, kanpur: 2, agra: 2, varanasi: 2, meerut: 2, indore: 2, bhopal: 2, nagpur: 2,
-  nashik: 2, aurangabad: 2, surat: 2, vadodara: 2, rajkot: 2, goa: 2, kochi: 2, thiruvananthapuram: 2,
-  coimbatore: 2, madurai: 2, mysuru: 2, mysore: 2, mangaluru: 2, visakhapatnam: 2, vijayawada: 2,
-  patna: 2, ranchi: 2, bhubaneswar: 2, raipur: 2, guwahati: 2,
+  delhi: 1,
+  "new delhi": 1,
+  mumbai: 1,
+  bombay: 1,
+  "navi mumbai": 1,
+  thane: 1,
+  bengaluru: 1,
+  bangalore: 1,
+  chennai: 1,
+  madras: 1,
+  kolkata: 1,
+  calcutta: 1,
+  hyderabad: 1,
+  pune: 1,
+  ahmedabad: 1,
+  gurugram: 1,
+  gurgaon: 1,
+  noida: 1,
+  ghaziabad: 1,
+  faridabad: 1,
+  chandigarh: 2,
+  panchkula: 2,
+  mohali: 2,
+  zirakpur: 2,
+  ludhiana: 2,
+  amritsar: 2,
+  jalandhar: 2,
+  patiala: 2,
+  ambala: 2,
+  karnal: 2,
+  panipat: 2,
+  shimla: 2,
+  jammu: 2,
+  srinagar: 2,
+  dehradun: 2,
+  jaipur: 2,
+  jodhpur: 2,
+  udaipur: 2,
+  lucknow: 2,
+  kanpur: 2,
+  agra: 2,
+  varanasi: 2,
+  meerut: 2,
+  indore: 2,
+  bhopal: 2,
+  nagpur: 2,
+  nashik: 2,
+  aurangabad: 2,
+  surat: 2,
+  vadodara: 2,
+  rajkot: 2,
+  goa: 2,
+  kochi: 2,
+  thiruvananthapuram: 2,
+  coimbatore: 2,
+  madurai: 2,
+  mysuru: 2,
+  mysore: 2,
+  mangaluru: 2,
+  visakhapatnam: 2,
+  vijayawada: 2,
+  patna: 2,
+  ranchi: 2,
+  bhubaneswar: 2,
+  raipur: 2,
+  guwahati: 2,
 };
 
 /** Regional wedding style a city suggests. Always marked as a guess for the user to confirm. */
 const CITY_STYLE: Record<string, string> = {
-  chandigarh: "punjabi", panchkula: "punjabi", mohali: "punjabi", zirakpur: "punjabi", ludhiana: "punjabi",
-  amritsar: "punjabi", jalandhar: "punjabi", patiala: "punjabi",
-  kolkata: "bengali", calcutta: "bengali",
-  chennai: "south-indian", madras: "south-indian", hyderabad: "south-indian", bengaluru: "south-indian",
-  bangalore: "south-indian", kochi: "south-indian", coimbatore: "south-indian", madurai: "south-indian",
-  thiruvananthapuram: "south-indian", visakhapatnam: "south-indian", vijayawada: "south-indian",
+  chandigarh: "punjabi",
+  panchkula: "punjabi",
+  mohali: "punjabi",
+  zirakpur: "punjabi",
+  ludhiana: "punjabi",
+  amritsar: "punjabi",
+  jalandhar: "punjabi",
+  patiala: "punjabi",
+  kolkata: "bengali",
+  calcutta: "bengali",
+  chennai: "south-indian",
+  madras: "south-indian",
+  hyderabad: "south-indian",
+  bengaluru: "south-indian",
+  bangalore: "south-indian",
+  kochi: "south-indian",
+  coimbatore: "south-indian",
+  madurai: "south-indian",
+  thiruvananthapuram: "south-indian",
+  visakhapatnam: "south-indian",
+  vijayawada: "south-indian",
 };
 
 const CITY_NAMES = Object.keys(CITY_TIERS).sort((a, b) => b.length - a.length);
@@ -189,7 +290,11 @@ export function parseLocal(text: string, today: string, context: { asking?: Know
   const eventType = fields.eventType ?? context.known?.eventType;
 
   if (eventType === "wedding") {
-    for (const [re, style] of STYLE_RULES) if (re.test(t)) { fields.subType = style; break; }
+    for (const [re, style] of STYLE_RULES)
+      if (re.test(t)) {
+        fields.subType = style;
+        break;
+      }
     const subs = SUB_EVENT_RULES.filter(([re]) => re.test(t)).map(([, s]) => s);
     if (subs.length) fields.subEvents = subs;
   }

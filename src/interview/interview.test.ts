@@ -132,7 +132,10 @@ describe("parseLocal — how families actually talk", () => {
 
 describe("sanitizeKnown — nothing invalid survives", () => {
   it("drops invalid fields and keeps the rest", () => {
-    const k = sanitizeKnown({ eventType: "wedding", guestCount: -5, totalBudgetINR: 99, city: "<script>", eventDate: "2026-02-30", diet: "keto" }, TODAY);
+    const k = sanitizeKnown(
+      { eventType: "wedding", guestCount: -5, totalBudgetINR: 99, city: "<script>", eventDate: "2026-02-30", diet: "keto" },
+      TODAY,
+    );
     expect(k).toEqual({ eventType: "wedding" });
   });
 
@@ -187,7 +190,12 @@ describe("nextQuestion — the interview script", () => {
   });
 
   it("every button's values pass validation", () => {
-    for (const k of [{}, { eventType: "wedding" as const }, { eventType: "community" as const }, { eventType: "party" as const, subType: "kitty", eventDate: "2026-12-01" }]) {
+    for (const k of [
+      {},
+      { eventType: "wedding" as const },
+      { eventType: "community" as const },
+      { eventType: "party" as const, subType: "kitty", eventDate: "2026-12-01" },
+    ]) {
       for (const opt of nextQuestion(k)!.options) {
         expect(sanitizeKnown({ ...k, ...opt.set }, TODAY)).toMatchObject(opt.set);
       }
@@ -195,7 +203,16 @@ describe("nextQuestion — the interview script", () => {
   });
 
   it("a finished interview produces input the planner accepts", () => {
-    const k = { eventType: "party" as const, subType: "kitty", eventDate: "2026-11-15", guestCount: 20, totalBudgetINR: 25_000, city: "Panchkula", cityTier: 2 as const, diet: "jain" as const };
+    const k = {
+      eventType: "party" as const,
+      subType: "kitty",
+      eventDate: "2026-11-15",
+      guestCount: 20,
+      totalBudgetINR: 25_000,
+      city: "Panchkula",
+      cityTier: 2 as const,
+      diet: "jain" as const,
+    };
     expect(() => buildPlan(toPlanInput(k), TODAY)).not.toThrow();
   });
 });
@@ -211,7 +228,11 @@ describe("runInterviewTurn — local first, AI only for gaps", () => {
 
   it("asks the AI when the local reader misses, and marks inferred fields as guesses", async () => {
     const ai = fakeAiClient([{ guestCount: 120, diet: "veg", inferred: ["diet"] }]);
-    const r = await runInterviewTurn({ text: "sau-sava sau ke aas paas", known: { eventType: "party", subType: "kitty", eventDate: "2026-12-01" } }, TODAY, ai);
+    const r = await runInterviewTurn(
+      { text: "sau-sava sau ke aas paas", known: { eventType: "party", subType: "kitty", eventDate: "2026-12-01" } },
+      TODAY,
+      ai,
+    );
     expect(ai.calls).toHaveLength(1);
     expect(r.known).toMatchObject({ guestCount: 120, diet: "veg" });
     expect(r.guessed).toContain("diet");
@@ -228,7 +249,16 @@ describe("runInterviewTurn — local first, AI only for gaps", () => {
   });
 
   it("re-validates everything the AI returns", async () => {
-    const ai = fakeAiClient([{ eventType: "wedding", subType: "langar", guestCount: 99_999, totalBudgetINR: 5, eventDate: "2020-01-01", city: "Delhi; DROP TABLE" }]);
+    const ai = fakeAiClient([
+      {
+        eventType: "wedding",
+        subType: "langar",
+        guestCount: 99_999,
+        totalBudgetINR: 5,
+        eventDate: "2020-01-01",
+        city: "Delhi; DROP TABLE",
+      },
+    ]);
     const r = await runInterviewTurn({ text: "something long that the local reader cannot use at all" }, TODAY, ai);
     expect(r.known).toEqual({ eventType: "wedding" });
   });
@@ -250,7 +280,11 @@ describe("runInterviewTurn — local first, AI only for gaps", () => {
   it("a tapped button confirms a previous guess", async () => {
     const first = await runInterviewTurn({ text: "shaadi in Ludhiana" }, TODAY, offlineClient);
     expect(first.guessed).toContain("subType");
-    const second = await runInterviewTurn({ known: first.known, guessed: first.guessed, set: { subType: "punjabi" } }, TODAY, offlineClient);
+    const second = await runInterviewTurn(
+      { known: first.known, guessed: first.guessed, set: { subType: "punjabi" } },
+      TODAY,
+      offlineClient,
+    );
     expect(second.guessed).not.toContain("subType");
   });
 

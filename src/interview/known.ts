@@ -44,7 +44,12 @@ const fieldSchemas = {
   eventMonth: z.number().int().min(1).max(12),
   guestCount: z.number().int().min(LIMITS.minGuests).max(LIMITS.maxGuests),
   totalBudgetINR: z.number().int().min(LIMITS.minBudgetINR).max(LIMITS.maxBudgetINR),
-  city: z.string().trim().min(2).max(60).regex(/^[\p{L}\p{M} .'-]+$/u),
+  city: z
+    .string()
+    .trim()
+    .min(2)
+    .max(60)
+    .regex(/^[\p{L}\p{M} .'-]+$/u),
   cityTier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   diet: z.enum(DIETS),
 } satisfies Record<KnownField, z.ZodType>;

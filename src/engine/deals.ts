@@ -93,11 +93,22 @@ export function reconcileBudget(budget: BudgetResult, tasks: readonly TimelineTa
     perKey.set(key, acc);
   }
 
-  let agreedINR = 0, advanceINR = 0, bookedPlannedINR = 0;
+  let agreedINR = 0,
+    advanceINR = 0,
+    bookedPlannedINR = 0;
   const lines: ReconciledLine[] = budget.lines.map((l) => {
     const deal = perKey.get(l.key);
     if (!deal) {
-      return { key: l.key, label: l.label, plannedINR: l.amountINR, booked: false, agreedINR: null, advanceINR: 0, dueINR: 0, differenceINR: 0 };
+      return {
+        key: l.key,
+        label: l.label,
+        plannedINR: l.amountINR,
+        booked: false,
+        agreedINR: null,
+        advanceINR: 0,
+        dueINR: 0,
+        differenceINR: 0,
+      };
     }
     agreedINR += deal.agreed;
     advanceINR += deal.advance;

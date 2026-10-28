@@ -26,11 +26,12 @@ describe("search text", () => {
     expect(searchText({ category: "venue", near: { lat: 30.7, lng: 76.85 } })).toBe("banquet hall near me");
   });
   it("covers every vendor category in every event type", () => {
-    for (const t of EVENT_TYPES) for (const st of SUB_TYPES[t]) {
-      for (const v of buildVendorChecklist(t, [st, "haldi", "mehendi", "sangeet", "ceremony", "reception"])) {
-        expect(SEARCH_TERMS[v.key], `${t}/${st}/${v.key}`).toBeTruthy();
+    for (const t of EVENT_TYPES)
+      for (const st of SUB_TYPES[t]) {
+        for (const v of buildVendorChecklist(t, [st, "haldi", "mehendi", "sangeet", "ceremony", "reception"])) {
+          expect(SEARCH_TERMS[v.key], `${t}/${st}/${v.key}`).toBeTruthy();
+        }
       }
-    }
   });
   it("rejects anything that isn't a city name or a location in India", () => {
     for (const bad of [
@@ -40,7 +41,8 @@ describe("search text", () => {
       { category: "catering" },
       { category: "catering", near: { lat: 51.5, lng: -0.1 } },
       { category: "catering", city: "Delhi", extra: 1 },
-    ]) expect(FindVendorsSchema.safeParse(bad).success, JSON.stringify(bad)).toBe(false);
+    ])
+      expect(FindVendorsSchema.safeParse(bad).success, JSON.stringify(bad)).toBe(false);
     expect(FindVendorsSchema.safeParse({ category: "catering", city: "S.A.S. Nagar" }).success).toBe(true);
   });
 });
@@ -48,16 +50,27 @@ describe("search text", () => {
 describe("sanitizePlaces", () => {
   it("keeps clean fields and rounds the rating", () => {
     const [v] = sanitizePlaces({ places: [place()] });
-    expect(v).toEqual({ id: "ChIJabc", name: "Shubh Rasoi Caterers", address: "SCO 12, Sector 5, Panchkula", phone: "098765 43210", rating: 4.5, ratingCount: 120, mapsUrl: "https://maps.google.com/?cid=123", website: "https://example.com/" });
+    expect(v).toEqual({
+      id: "ChIJabc",
+      name: "Shubh Rasoi Caterers",
+      address: "SCO 12, Sector 5, Panchkula",
+      phone: "098765 43210",
+      rating: 4.5,
+      ratingCount: 120,
+      mapsUrl: "https://maps.google.com/?cid=123",
+      website: "https://example.com/",
+    });
   });
   it("drops closed businesses, non-Google map links and malformed entries", () => {
-    const out = sanitizePlaces({ places: [
-      place({ businessStatus: "CLOSED_PERMANENTLY" }),
-      place({ googleMapsUri: "https://evil.example/?q=1" }),
-      place({ googleMapsUri: "javascript:alert(1)" }),
-      { id: "x" },
-      place({ displayName: { text: "<b>Good</b> Tent House" }, websiteUri: "javascript:alert(1)", nationalPhoneNumber: "call me" }),
-    ] });
+    const out = sanitizePlaces({
+      places: [
+        place({ businessStatus: "CLOSED_PERMANENTLY" }),
+        place({ googleMapsUri: "https://evil.example/?q=1" }),
+        place({ googleMapsUri: "javascript:alert(1)" }),
+        { id: "x" },
+        place({ displayName: { text: "<b>Good</b> Tent House" }, websiteUri: "javascript:alert(1)", nationalPhoneNumber: "call me" }),
+      ],
+    });
     expect(out).toHaveLength(1);
     expect(out[0].name).toBe("bGood/b Tent House");
     expect(out[0].website).toBeUndefined();
@@ -95,15 +108,25 @@ describe("Google client", () => {
 });
 
 describe("POST /api/vendors/find", () => {
-  let server: Server, base: string, calls = 0;
+  let server: Server,
+    base: string,
+    calls = 0;
   beforeAll(async () => {
-    const places = { available: true, async search() { calls++; if (calls === 2) throw new Error("boom"); return sanitizePlaces({ places: [place()] }); } };
+    const places = {
+      available: true,
+      async search() {
+        calls++;
+        if (calls === 2) throw new Error("boom");
+        return sanitizePlaces({ places: [place()] });
+      },
+    };
     server = createApp({ today: () => "2026-10-28", ai: offlineClient, places, placesRateLimitPerMinute: 50 }).listen(0);
     await new Promise((r) => server.once("listening", r));
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
   afterAll(() => new Promise<void>((r) => server.close(() => r())));
-  const find = (body: unknown, b = base) => fetch(`${b}/api/vendors/find`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const find = (body: unknown, b = base) =>
+    fetch(`${b}/api/vendors/find`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
   it("returns real listings with the source named", async () => {
     const r = await (await find({ category: "catering", city: "Panchkula" })).json();

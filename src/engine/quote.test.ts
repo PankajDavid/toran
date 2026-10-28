@@ -33,7 +33,10 @@ describe("a clean quote", () => {
 describe("arithmetic", () => {
   it("catches a line where quantity × rate ≠ amount (the concept-doc example)", () => {
     const q = caterer({
-      lines: [{ description: "Veg buffet per plate", quantity: 250, unit: "plate", rate: 650, amountINR: 1_72_500 }, ...caterer().lines.slice(1)],
+      lines: [
+        { description: "Veg buffet per plate", quantity: 250, unit: "plate", rate: 650, amountINR: 1_72_500 },
+        ...caterer().lines.slice(1),
+      ],
     });
     const f = checkQuote(q, { guestCount: 250 }).findings.find((x) => x.code === "LINE_MATH")!;
     expect(f.severity).toBe("problem");
@@ -45,7 +48,9 @@ describe("arithmetic", () => {
   it("works out the total with the maths corrected, including GST", () => {
     const q = caterer({
       lines: [{ description: "Veg buffet per plate", quantity: 250, unit: "plate", rate: 650, amountINR: 1_72_500 }],
-      subtotalINR: 1_72_500, gst: { status: "extra" }, totalINR: undefined,
+      subtotalINR: 1_72_500,
+      gst: { status: "extra" },
+      totalINR: undefined,
     });
     const r = checkQuote(q, { guestCount: 250 });
     expect(r.trueTotalINR).toBe(2_03_550); // 1,72,500 + 18%
@@ -54,12 +59,23 @@ describe("arithmetic", () => {
   });
 
   it("asks 'Are … included' for several missing items and 'Is … included' for one", () => {
-    const many = checkQuote(caterer({ lines: [{ description: "Veg buffet per plate", quantity: 300, unit: "plate", rate: 650, amountINR: 1_95_000 }], subtotalINR: 1_95_000, totalINR: 1_95_000 }), ctx);
+    const many = checkQuote(
+      caterer({
+        lines: [{ description: "Veg buffet per plate", quantity: 300, unit: "plate", rate: 650, amountINR: 1_95_000 }],
+        subtotalINR: 1_95_000,
+        totalINR: 1_95_000,
+      }),
+      ctx,
+    );
     expect(many.questions.some((x) => x.startsWith("Are crockery"))).toBe(true);
   });
 
   it("allows ₹1 rounding on decimal rates", () => {
-    const q = caterer({ lines: [{ description: "Sweets per plate", quantity: 3, unit: "plate", rate: 33.33, amountINR: 100 }] , subtotalINR: undefined, totalINR: undefined });
+    const q = caterer({
+      lines: [{ description: "Sweets per plate", quantity: 3, unit: "plate", rate: 33.33, amountINR: 100 }],
+      subtotalINR: undefined,
+      totalINR: undefined,
+    });
     expect(codes(q)).not.toContain("LINE_MATH");
   });
 
@@ -68,7 +84,11 @@ describe("arithmetic", () => {
   });
 
   it("uses quantity × rate when a line has no amount", () => {
-    const q = caterer({ lines: [{ description: "Veg buffet per plate", quantity: 300, unit: "plate", rate: 650 }], subtotalINR: undefined, totalINR: undefined });
+    const q = caterer({
+      lines: [{ description: "Veg buffet per plate", quantity: 300, unit: "plate", rate: 650 }],
+      subtotalINR: undefined,
+      totalINR: undefined,
+    });
     expect(checkQuote(q, ctx).linesTotalINR).toBe(1_95_000);
   });
 
@@ -108,7 +128,9 @@ describe("GST", () => {
 
 describe("guests and minimums", () => {
   it("prices the empty plates when the minimum guarantee is above the guest count", () => {
-    const f = checkQuote(caterer({ minimumGuarantee: { quantity: 350, unit: "plates" } }), ctx).findings.find((x) => x.code === "MIN_GUARANTEE")!;
+    const f = checkQuote(caterer({ minimumGuarantee: { quantity: 350, unit: "plates" } }), ctx).findings.find(
+      (x) => x.code === "MIN_GUARANTEE",
+    )!;
     expect(f.message).toContain("50 that nobody eats: about ₹32,500");
     expect(f.question).toContain("300 instead of 350");
   });
@@ -125,7 +147,11 @@ describe("guests and minimums", () => {
 
 describe("missing items", () => {
   it("asks about crockery, staff, counters and water when a caterer doesn't mention them", () => {
-    const q = caterer({ lines: [{ description: "Veg buffet per plate", quantity: 300, unit: "plate", rate: 650, amountINR: 1_95_000 }], subtotalINR: 1_95_000, totalINR: 1_95_000 });
+    const q = caterer({
+      lines: [{ description: "Veg buffet per plate", quantity: 300, unit: "plate", rate: 650, amountINR: 1_95_000 }],
+      subtotalINR: 1_95_000,
+      totalINR: 1_95_000,
+    });
     const f = checkQuote(q, ctx).findings.find((x) => x.code === "MISSING_ITEMS")!;
     expect(f.message).toContain("crockery and cutlery");
     expect(f.message).toContain("serving staff");
@@ -136,7 +162,8 @@ describe("missing items", () => {
   it("counts items mentioned in the terms, not just the lines", () => {
     const q = caterer({
       lines: [{ description: "Veg buffet per plate", quantity: 300, unit: "plate", rate: 650, amountINR: 1_95_000 }],
-      subtotalINR: 1_95_000, totalINR: 1_95_000,
+      subtotalINR: 1_95_000,
+      totalINR: 1_95_000,
       notes: ["Rate includes crockery, waiters, buffet counters and RO water"],
     });
     expect(codes(q)).not.toContain("MISSING_ITEMS");
@@ -149,7 +176,8 @@ describe("missing items", () => {
         { description: "Crockery and service staff", amountINR: 10_000 },
         { description: "Buffet counters setup", amountINR: 5_000 },
       ],
-      subtotalINR: 2_10_000, totalINR: 2_10_000,
+      subtotalINR: 2_10_000,
+      totalINR: 2_10_000,
       notes: ["Electricity and water to be arranged by party."],
     });
     const r = checkQuote(q, ctx);

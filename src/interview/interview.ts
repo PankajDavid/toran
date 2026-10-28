@@ -66,15 +66,22 @@ const AI_SCHEMA = {
 } as const;
 
 const KNOWN_FIELD_SET = new Set<string>([
-  "eventType", "subType", "subEvents", "eventDate", "eventMonth", "guestCount", "totalBudgetINR", "city", "cityTier", "diet",
+  "eventType",
+  "subType",
+  "subEvents",
+  "eventDate",
+  "eventMonth",
+  "guestCount",
+  "totalBudgetINR",
+  "city",
+  "cityTier",
+  "diet",
 ]);
 const asFields = (xs: unknown): KnownField[] =>
   Array.isArray(xs) ? (xs.filter((x) => typeof x === "string" && KNOWN_FIELD_SET.has(x)) as KnownField[]) : [];
 
 function changedFields(before: Known, after: Known): KnownField[] {
-  return (Object.keys(after) as KnownField[]).filter(
-    (f) => JSON.stringify(before[f]) !== JSON.stringify(after[f]),
-  );
+  return (Object.keys(after) as KnownField[]).filter((f) => JSON.stringify(before[f]) !== JSON.stringify(after[f]));
 }
 
 /**

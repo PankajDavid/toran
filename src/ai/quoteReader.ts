@@ -91,7 +91,13 @@ const RawSchema = z.object({
 });
 
 const clean = (s: unknown, max: number) =>
-  typeof s === "string" ? s.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : undefined;
+  typeof s === "string"
+    ? s
+        .replace(/[\p{Cc}<>]/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, max)
+    : undefined;
 const rupees = (n: unknown) => (typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 5e7 ? Math.round(n) : undefined);
 
 export type QuoteDraft = Omit<Quote, "category">;
@@ -119,10 +125,15 @@ export function sanitizeRead(raw: unknown): ReadResult {
       amountINR: rupees(o.amountINR),
     };
     const ok = QuoteLineSchema.safeParse(line);
-    if (!ok.success) { dropped++; return []; }
+    if (!ok.success) {
+      dropped++;
+      return [];
+    }
     return [ok.data];
   });
-  const status = (GST_STATUSES as readonly string[]).includes(d.gstStatus ?? "") ? (d.gstStatus as Quote["gst"]["status"]) : "not-mentioned";
+  const status = (GST_STATUSES as readonly string[]).includes(d.gstStatus ?? "")
+    ? (d.gstStatus as Quote["gst"]["status"])
+    : "not-mentioned";
   const draft: QuoteDraft = {
     vendorName: clean(d.vendorName, 80) || undefined,
     lines,
@@ -134,18 +145,25 @@ export function sanitizeRead(raw: unknown): ReadResult {
     },
     totalINR: rupees(d.totalINR),
     minimumGuarantee:
-      typeof d.minimumGuarantee === "number" && Number.isInteger(d.minimumGuarantee) && d.minimumGuarantee >= 1 && d.minimumGuarantee <= 100_000
+      typeof d.minimumGuarantee === "number" &&
+      Number.isInteger(d.minimumGuarantee) &&
+      d.minimumGuarantee >= 1 &&
+      d.minimumGuarantee <= 100_000
         ? { quantity: d.minimumGuarantee, unit: clean(d.minimumGuaranteeUnit, 20) || undefined }
         : undefined,
     advance:
       d.advancePercent !== undefined || d.advanceINR !== undefined
         ? {
-            percent: typeof d.advancePercent === "number" && d.advancePercent >= 0 && d.advancePercent <= 100 ? d.advancePercent : undefined,
+            percent:
+              typeof d.advancePercent === "number" && d.advancePercent >= 0 && d.advancePercent <= 100 ? d.advancePercent : undefined,
             amountINR: rupees(d.advanceINR),
           }
         : undefined,
     refundMentioned: d.refundMentioned === true,
-    notes: (d.notes ?? []).map((n) => clean(n, 200)).filter((n): n is string => !!n).slice(0, 10),
+    notes: (d.notes ?? [])
+      .map((n) => clean(n, 200))
+      .filter((n): n is string => !!n)
+      .slice(0, 10),
   };
   return { readable: d.readable !== false && lines.length > 0, draft, dropped };
 }
@@ -157,10 +175,7 @@ export async function readQuote(file: Buffer, mime: QuoteMime, ai: AiClient): Pr
     timeoutMs: 45_000,
     system: SYSTEM,
     schema: SCHEMA,
-    parts: [
-      { text: "Transcribe this vendor quotation." },
-      { inlineData: { mimeType: mime, data: file.toString("base64") } },
-    ],
+    parts: [{ text: "Transcribe this vendor quotation." }, { inlineData: { mimeType: mime, data: file.toString("base64") } }],
   });
   return sanitizeRead(raw);
 }

@@ -59,7 +59,11 @@ const AI_SCHEMA = {
     menu: {
       type: "array",
       maxItems: 5,
-      items: { type: "object", properties: { course: { type: "string" }, items: { type: "array", items: { type: "string" } } }, required: ["course", "items"] },
+      items: {
+        type: "object",
+        properties: { course: { type: "string" }, items: { type: "array", items: { type: "string" } } },
+        required: ["course", "items"],
+      },
     },
     invitation: { type: "string" },
     tips: { type: "array", maxItems: 5, items: { type: "string" } },
@@ -69,9 +73,11 @@ const AI_SCHEMA = {
 
 /** Any money figure. Ideas must not contain prices — budgets come only from the engine. */
 const MONEY = /₹|\brs\.?\s*\d|\binr\b|\$\s*\d|\d[\d,.]*\s*(?:lakh|lac|crore|cr|k|rupees?)\b|\bper\s+(?:plate|head|person)\b/i;
-const NON_VEG = /\b(chicken|mutton|lamb|goat|fish|prawns?|shrimp|crab|meat|keema|beef|pork|egg|eggs|anda|seekh|butter chicken|biryani \(chicken\))\b/i;
+const NON_VEG =
+  /\b(chicken|mutton|lamb|goat|fish|prawns?|shrimp|crab|meat|keema|beef|pork|egg|eggs|anda|seekh|butter chicken|biryani \(chicken\))\b/i;
 /** Jain food also avoids root vegetables, onion and garlic. */
-const NOT_JAIN = /\b(onions?|garlic|potato(?:es)?|aloo|carrots?|gajar|beetroot|radish|mooli|ginger|adrak|pyaz|lahsun|sweet potato|shakarkandi)\b/i;
+const NOT_JAIN =
+  /\b(onions?|garlic|potato(?:es)?|aloo|carrots?|gajar|beetroot|radish|mooli|ginger|adrak|pyaz|lahsun|sweet potato|shakarkandi)\b/i;
 
 function cleanText(s: string, max: number): string | null {
   const t = s.replace(/\s+/g, " ").trim();
@@ -83,17 +89,26 @@ export function sanitizeIdeas(raw: unknown, diet?: string): { ideas: Ideas; remo
   const parsed = rawIdeasSchema.safeParse(raw);
   if (!parsed.success) return null;
   let removed = 0;
-  const keep = (s: string | null) => (s === null ? (removed++, false) : true);
+  const keep = (s: string | null): s is string => {
+    if (s === null) removed++;
+    return s !== null;
+  };
 
   const themes = parsed.data.themes.slice(0, 3).flatMap((t) => {
     const name = cleanText(t.name, 60);
     const description = cleanText(t.description, 300);
     if (!keep(name) || !keep(description)) return [];
-    const colours = t.colours.map((c) => cleanText(c, 30)).filter((c): c is string => c !== null).slice(0, 5);
-    return [{ name: name!, colours, description: description! }];
+    const colours = t.colours
+      .map((c) => cleanText(c, 30))
+      .filter((c): c is string => c !== null)
+      .slice(0, 5);
+    return [{ name, colours, description }];
   });
 
-  const decor = parsed.data.decor.slice(0, 6).map((d) => cleanText(d, SHORT)).filter(keep) as string[];
+  const decor = parsed.data.decor
+    .slice(0, 6)
+    .map((d) => cleanText(d, SHORT))
+    .filter(keep) as string[];
 
   const foodOk = (item: string) => {
     if ((diet === "veg" || diet === "jain") && NON_VEG.test(item)) return false;
@@ -106,13 +121,20 @@ export function sanitizeIdeas(raw: unknown, diet?: string): { ideas: Ideas; remo
     const items = c.items
       .slice(0, 8)
       .map((i) => cleanText(i, 80))
-      .filter((i): i is string => (i !== null && foodOk(i)) || (removed++, false));
-    return items.length ? [{ course: course!, items }] : [];
+      .filter((i): i is string => {
+        const ok = i !== null && foodOk(i);
+        if (!ok) removed++;
+        return ok;
+      });
+    return items.length ? [{ course, items }] : [];
   });
 
   const invitationRaw = cleanText(parsed.data.invitation, LONG);
   if (invitationRaw === null && parsed.data.invitation) removed++;
-  const tips = parsed.data.tips.slice(0, 5).map((t) => cleanText(t, 200)).filter(keep) as string[];
+  const tips = parsed.data.tips
+    .slice(0, 5)
+    .map((t) => cleanText(t, 200))
+    .filter(keep) as string[];
 
   const ideas: Ideas = { themes, decor, menu, invitation: invitationRaw ?? "", tips };
   if (!themes.length && !decor.length && !menu.length) return null;
@@ -175,21 +197,57 @@ export async function generateIdeas(
 
 const OFFLINE_THEMES: Record<EventType, Ideas["themes"]> = {
   wedding: [
-    { name: "Phulkari Bloom", colours: ["marigold", "magenta", "emerald"], description: "Bright phulkari dupattas as drapes, marigold strings and brass urlis for a warm Punjabi feel." },
-    { name: "Ivory and Gold", colours: ["ivory", "gold", "blush"], description: "Soft white florals, gold accents and fairy lights for an elegant, timeless look." },
-    { name: "Temple Traditions", colours: ["maroon", "gold", "jasmine white"], description: "Banana leaves, jasmine garlands and brass lamps inspired by South Indian temple weddings." },
+    {
+      name: "Phulkari Bloom",
+      colours: ["marigold", "magenta", "emerald"],
+      description: "Bright phulkari dupattas as drapes, marigold strings and brass urlis for a warm Punjabi feel.",
+    },
+    {
+      name: "Ivory and Gold",
+      colours: ["ivory", "gold", "blush"],
+      description: "Soft white florals, gold accents and fairy lights for an elegant, timeless look.",
+    },
+    {
+      name: "Temple Traditions",
+      colours: ["maroon", "gold", "jasmine white"],
+      description: "Banana leaves, jasmine garlands and brass lamps inspired by South Indian temple weddings.",
+    },
   ],
   birthday: [
-    { name: "Under the Sea", colours: ["aqua", "coral", "sand"], description: "Bubble balloons, fish cut-outs and a blue table for a playful ocean party." },
-    { name: "Retro Bollywood", colours: ["red", "gold", "black"], description: "Old film posters, a filmi photo booth and a dress-up-as-your-favourite-star theme." },
+    {
+      name: "Under the Sea",
+      colours: ["aqua", "coral", "sand"],
+      description: "Bubble balloons, fish cut-outs and a blue table for a playful ocean party.",
+    },
+    {
+      name: "Retro Bollywood",
+      colours: ["red", "gold", "black"],
+      description: "Old film posters, a filmi photo booth and a dress-up-as-your-favourite-star theme.",
+    },
   ],
   party: [
-    { name: "Desi Glam Night", colours: ["teal", "gold", "pink"], description: "Sequins, statement dupattas and a mini photo corner with fun props." },
-    { name: "Garden Tea Party", colours: ["mint", "peach", "white"], description: "Floral table runners, kulhad chai and light snacks in an afternoon garden setting." },
+    {
+      name: "Desi Glam Night",
+      colours: ["teal", "gold", "pink"],
+      description: "Sequins, statement dupattas and a mini photo corner with fun props.",
+    },
+    {
+      name: "Garden Tea Party",
+      colours: ["mint", "peach", "white"],
+      description: "Floral table runners, kulhad chai and light snacks in an afternoon garden setting.",
+    },
   ],
   community: [
-    { name: "Festival of Lights", colours: ["saffron", "gold", "deep red"], description: "Diyas along the paths, rangoli at the entrance and strings of warm lights across the ground." },
-    { name: "Seva and Simplicity", colours: ["white", "saffron", "green"], description: "Clean white canopies, flowers at the stage and clear signage for volunteers and visitors." },
+    {
+      name: "Festival of Lights",
+      colours: ["saffron", "gold", "deep red"],
+      description: "Diyas along the paths, rangoli at the entrance and strings of warm lights across the ground.",
+    },
+    {
+      name: "Seva and Simplicity",
+      colours: ["white", "saffron", "green"],
+      description: "Clean white canopies, flowers at the stage and clear signage for volunteers and visitors.",
+    },
   ],
 };
 
@@ -212,14 +270,23 @@ const OFFLINE_MENU: Record<"veg" | "jain" | "non-veg", Ideas["menu"]> = {
 };
 
 const OFFLINE_DECOR: Record<EventType, string[]> = {
-  wedding: ["Marigold and rose entrance arch", "Floral backdrop for the stage", "Fairy-light canopy over the dining area", "Personalised welcome board"],
+  wedding: [
+    "Marigold and rose entrance arch",
+    "Floral backdrop for the stage",
+    "Fairy-light canopy over the dining area",
+    "Personalised welcome board",
+  ],
   birthday: ["Balloon arch at the entrance", "Theme cake table backdrop", "Photo booth with props"],
   party: ["Theme table centrepieces", "Photo corner with props", "Soft string lights"],
   community: ["Rangoli at the entrance", "Clear signage for stalls and seating", "Lighting along walkways"],
 };
 
 const OFFLINE_TIPS: Record<EventType, string[]> = {
-  wedding: ["Confirm the final headcount with the caterer a week before", "Keep one family member as the single point of contact for each vendor", "Carry a small emergency kit on the day"],
+  wedding: [
+    "Confirm the final headcount with the caterer a week before",
+    "Keep one family member as the single point of contact for each vendor",
+    "Carry a small emergency kit on the day",
+  ],
   birthday: ["Plan games by age group", "Keep the cake-cutting before the meal so children stay engaged"],
   party: ["Plan two or three games with small prizes", "Share the menu with guests in advance if anyone has dietary needs"],
   community: ["Assign a volunteer lead for each area", "Keep first aid and water stations clearly marked"],

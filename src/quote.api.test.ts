@@ -104,7 +104,13 @@ describe("POST /api/quote/check", () => {
   });
 
   it("accepts a full 60-line quote (bigger than the normal 10kb limit)", async () => {
-    const lines = Array.from({ length: 60 }, (_, i) => ({ description: `Item number ${i + 1} with a fairly long description`, quantity: 10, unit: "piece", rate: 100, amountINR: 1000 }));
+    const lines = Array.from({ length: 60 }, (_, i) => ({
+      description: `Item number ${i + 1} with a fairly long description`,
+      quantity: 10,
+      unit: "piece",
+      rate: 100,
+      amountINR: 1000,
+    }));
     expect((await check({ quote: { ...quote, lines, minimumGuarantee: undefined }, guestCount: 250 })).status).toBe(200);
   });
 
@@ -119,7 +125,11 @@ describe("offline AI", () => {
   it("returns 503 with manual entry offered", async () => {
     const s = createApp({ today: () => "2026-10-28", ai: offlineClient }).listen(0);
     await new Promise((r) => s.once("listening", r));
-    const res = await fetch(`http://127.0.0.1:${(s.address() as AddressInfo).port}/api/quote/read`, { method: "POST", headers: { "content-type": "image/jpeg" }, body: JPEG });
+    const res = await fetch(`http://127.0.0.1:${(s.address() as AddressInfo).port}/api/quote/read`, {
+      method: "POST",
+      headers: { "content-type": "image/jpeg" },
+      body: JPEG,
+    });
     expect(res.status).toBe(503);
     expect((await res.json()).manual).toBe(true);
     await new Promise<void>((r) => s.close(() => r()));
