@@ -98,6 +98,8 @@ const EXPECTED: Record<string, { item: string; words: RegExp }[]> = {
     { item: "drinking water", words: /water|bisleri|mineral|aquafina|ro\b/i },
   ],
   venue: [
+    { item: "drinking water", words: /water|bisleri|mineral|aquafina|ro\b/i },
+    { item: "decoration", words: /decor|flower|lighting/i },
     { item: "power backup (generator)", words: /generator|genset|dg\b|power\s*backup|backup/i },
     { item: "cleaning after the event", words: /clean|housekeep|safai/i },
     { item: "chairs and seating", words: /chair|seat|sofa|kursi/i },
@@ -217,6 +219,22 @@ export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
     });
   }
 
+  // 3b. No subtotal written: the written total must match the lines (or lines + GST when GST is extra).
+  if (q.subtotalINR === undefined && q.totalINR !== undefined && !unpriced && !findings.some((f) => f.code === "TOTAL_MISMATCH")) {
+    const fits = [linesTotalINR, ...(q.gst.status === "extra" ? [linesTotalINR + gstINR] : [])].some(
+      (x) => Math.abs(x - (q.totalINR ?? 0)) <= 1,
+    );
+    if (!fits) {
+      const diff = Math.abs(linesTotalINR - q.totalINR);
+      add({
+        code: "TOTAL_MISMATCH",
+        severity: "problem",
+        message: `The items add up to ${inr(linesTotalINR)}, but the total says ${inr(q.totalINR)}. Difference ${inr(diff)}.${q.totalINR < linesTotalINR ? " If that's a package discount, get it in writing." : ""}`,
+        question: `The items add up to ${inr(linesTotalINR)}, but the total shows ${inr(q.totalINR)}. Which is the final amount${q.totalINR < linesTotalINR ? ", and is the difference a discount" : ""}?`,
+      });
+    }
+  }
+
   // 4. Minimum guarantee vs guest count.
   const perGuest = q.lines.find(
     (l) => l.rate !== undefined && ((l.unit && PER_GUEST_UNIT.test(l.unit)) || PER_GUEST_UNIT.test(l.description)),
@@ -271,6 +289,30 @@ export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
     });
   }
 
+  // 6b. Costs that sit outside the total: "diesel extra", "travel extra", "subject to seasonal rates",
+  // "extra hours at 15,000 per hour". GST has its own check, and "arranged by party" items are above.
+  const EXTRA_COST =
+    /\bextra\b|chargeable|charged\s+(separately|extra|at|@)|additional(ly)?\s+(charge|cost)|subject\s+to|as\s+(per\s+)?actuals?|at\s+actuals?|per\s+(hour|hr)\b|escalat/i;
+  const unpricedLines = q.lines.filter((l) => lineAmount(l) === null).map((l) => l.description);
+  const extras = [...(q.notes ?? []), ...unpricedLines]
+    .filter((seg) => EXTRA_COST.test(seg) && !/\b(gst|tax|taxes)\b/i.test(seg) && !/arranged\s+by/i.test(seg))
+    .map((seg) =>
+      seg
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/[.;,]$/, ""),
+    )
+    .filter((seg, i, all) => seg && all.indexOf(seg) === i)
+    .slice(0, 5);
+  if (extras.length) {
+    add({
+      code: "EXTRA_CHARGES",
+      severity: "warning",
+      message: `Costs outside the total: ${extras.map((x) => `"${x}"`).join(", ")}. The real bill will be higher than ${inr(trueTotalINR)}.`,
+      question: `The quote says ${extras.map((x) => `"${x}"`).join(", ")}. Could you give a fixed amount for ${extras.length === 1 ? "this" : "each of these"} so we know the full cost?`,
+    });
+  }
+
   // 7. Against the planned budget line.
   let budgetGapINR: number | null = null;
   if (ctx.plannedINR !== undefined) {
@@ -286,19 +328,39 @@ export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
     }
   }
 
-  // 8. Payment terms.
-  const advancePct =
-    q.advance?.percent ??
-    (q.advance?.amountINR !== undefined && trueTotalINR > 0 ? Math.round((q.advance.amountINR / trueTotalINR) * 100) : undefined);
+  // 8. Payment terms. "Full payment before setup" is a 100% advance, whatever the reader extracted.
+  const terms = [...(q.notes ?? []), ...q.lines.map((l) => l.description)];
+  const fullUpfront = terms.some((t) =>
+    /(full|entire|complete|100\s*%)\s*(payment|amount)?\s*(in\s+advance|before|prior\s+to|at\s+(the\s+)?time\s+of\s+booking|advance)/i.test(
+      t,
+    ),
+  );
+  const advancePct = fullUpfront
+    ? 100
+    : (q.advance?.percent ??
+      (q.advance?.amountINR !== undefined && trueTotalINR > 0 ? Math.round((q.advance.amountINR / trueTotalINR) * 100) : undefined));
   if (advancePct !== undefined && advancePct > 50) {
     add({
       code: "HIGH_ADVANCE",
-      severity: "warning",
-      message: `The advance is ${num(advancePct)}%. Paying more than half before the event leaves you little leverage.`,
+      // Paying everything before the work is done is the riskiest term on any quote.
+      severity: advancePct >= 90 ? "problem" : "warning",
+      message:
+        advancePct >= 90
+          ? `It asks for ${num(advancePct)}% before the event. If anything goes wrong, you have no money left to hold back.`
+          : `The advance is ${num(advancePct)}%. Paying more than half before the event leaves you little leverage.`,
       question: `Could the advance be lowered to 25–30%, with the rest paid after the event?`,
     });
   }
-  if (!q.refundMentioned) {
+  const nonRefundable = terms.some((t) => /non[\s-]?refundable|not\s+refundable|no\s+refunds?|will\s+not\s+be\s+refunded/i.test(t));
+  if (nonRefundable) {
+    add({
+      code: "NON_REFUNDABLE",
+      severity: "problem",
+      message: "The advance is non-refundable. If plans change, you lose it all.",
+      question:
+        "If we have to cancel or change the date, could the advance be adjusted against a new date, or refunded after deducting your actual costs?",
+    });
+  } else if (!q.refundMentioned) {
     add({
       code: "NO_REFUND_TERMS",
       severity: "warning",

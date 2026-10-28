@@ -209,6 +209,47 @@ describe("payment terms", () => {
   });
 });
 
+describe("costs outside the total and harsh terms (from the sample quotes)", () => {
+  it("lists extra costs like diesel, travel, overtime and seasonal rates, but not GST", () => {
+    const q = caterer({
+      category: "decor",
+      notes: ["GST extra as applicable", "Flowers subject to seasonal rates", "Diesel extra", "Extra hours charged at 15,000 per hour"],
+    });
+    const f = checkQuote(q, ctx).findings.find((x) => x.code === "EXTRA_CHARGES")!;
+    expect(f.message).toContain('"Flowers subject to seasonal rates"');
+    expect(f.message).toContain('"Diesel extra"');
+    expect(f.message).toContain('"Extra hours charged at 15,000 per hour"');
+    expect(f.message).not.toContain("GST");
+    expect(f.question).toContain("fixed amount for each");
+  });
+  it("catches a written total that doesn't match the items when there's no subtotal", () => {
+    const q = caterer({ subtotalINR: undefined, totalINR: 2_16_000, gst: { status: "not-mentioned" } });
+    const f = checkQuote(q, ctx).findings.find((x) => x.code === "TOTAL_MISMATCH")!;
+    expect(f.message).toContain("₹2,26,000");
+    expect(f.message).toContain("package discount");
+    // A total that equals the items, or items + GST when GST is extra, is fine.
+    expect(codes(caterer({ subtotalINR: undefined, totalINR: 2_26_000, gst: { status: "not-mentioned" } }))).not.toContain(
+      "TOTAL_MISMATCH",
+    );
+    expect(codes(caterer({ subtotalINR: undefined, totalINR: 2_66_680, gst: { status: "extra" } }))).not.toContain("TOTAL_MISMATCH");
+  });
+  it("doesn't flag a quote with nothing outside the total", () => {
+    expect(codes(caterer())).not.toContain("EXTRA_CHARGES");
+  });
+  it("treats 'full payment before setup' as a 100% advance", () => {
+    const r = checkQuote(caterer({ notes: ["Full payment before setup"] }), ctx);
+    const f = r.findings.find((x) => x.code === "HIGH_ADVANCE")!;
+    expect(f.message).toContain("100%");
+    expect(f.severity).toBe("problem");
+  });
+  it("flags a non-refundable advance as a problem, instead of 'no refund terms'", () => {
+    const r = checkQuote(caterer({ refundMentioned: true, notes: ["Advance is non-refundable"] }), ctx);
+    expect(r.findings.find((x) => x.code === "NON_REFUNDABLE")!.severity).toBe("problem");
+    expect(r.findings.map((x) => x.code)).not.toContain("NO_REFUND_TERMS");
+    expect(r.problems).toBe(1);
+  });
+});
+
 describe("vendor message", () => {
   it("numbers every question and greets the vendor by name", () => {
     const r = checkQuote(caterer({ gst: { status: "not-mentioned" }, refundMentioned: false }), ctx);
