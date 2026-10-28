@@ -1146,6 +1146,9 @@
           o.booking.lineKey === booking.lineKey
         ) {
           o.status = "shortlisted";
+          if (o.agreedINR) o.quoteINR = o.agreedINR;
+          delete o.agreedINR;
+          delete o.advanceINR;
           delete o.booking;
         }
       v.booking = booking;
@@ -1670,6 +1673,9 @@
         o.booking.lineKey === booking.lineKey
       ) {
         o.status = "shortlisted";
+        if (o.agreedINR) o.quoteINR = o.agreedINR;
+        delete o.agreedINR;
+        delete o.advanceINR;
         delete o.booking;
       }
     }
@@ -2017,7 +2023,32 @@
       : r.warnings
         ? `${r.warnings} thing${r.warnings === 1 ? "" : "s"} to ask`
         : "Looks clean";
-    const advance = el("input", { id: "book-adv", type: "text", inputmode: "decimal", placeholder: "0 if none yet" });
+    // Is this vendor (or this budget line) already booked? Then say so instead of booking twice.
+    const who = quote.vendorName || "this vendor";
+    const bp = state.plan ? bookingPlan(quote.category, quote.vendorName) : { kind: "new" };
+    let bookTitle = `Decided? Book ${who} for ${inr(r.trueTotalINR)}`;
+    let bookNote = "";
+    let bookButton = "Book this vendor";
+    let alreadyBooked = "";
+    if (bp.kind === "update") {
+      if (bp.deal.agreedINR === r.trueTotalINR)
+        alreadyBooked = `${who} is booked for ${inr(bp.deal.agreedINR)} (advance ${inr(bp.deal.advanceINR)}). It's in your budget.`;
+      else {
+        bookTitle = `${who} is already booked for ${inr(bp.deal.agreedINR)}`;
+        bookNote = `Update the booking to this quote's ${inr(r.trueTotalINR)}? It replaces the old amount, it doesn't add to it.`;
+        bookButton = "Update booking";
+      }
+    } else if (bp.kind === "replace" && bp.deal) {
+      bookNote = `You've already booked ${bp.holder ? bp.holder.name : "this"} for ${inr(bp.deal.agreedINR)}. Booking ${who} replaces that booking.`;
+      bookButton = "Replace booking";
+    }
+    const advance = el("input", {
+      id: "book-adv",
+      type: "text",
+      inputmode: "decimal",
+      placeholder: "0 if none yet",
+      value: bp.kind === "update" && bp.deal.advanceINR ? bp.deal.advanceINR.toLocaleString("en-IN") : null,
+    });
     const bookMsg = el("p", { class: "booking-msg", role: "alert" });
     const card = el(
       "section",
@@ -2105,13 +2136,15 @@
             bookVendor(quote, r, adv);
           },
         },
-        el("p", { class: "booking-title" }, `Decided? Book ${quote.vendorName || "this vendor"} for ${inr(r.trueTotalINR)}`),
+        el("p", { class: "booking-title" }, bookTitle),
+        bookNote ? el("p", { class: "booking-hint" }, bookNote) : null,
         el("label", { for: "book-adv" }, "Advance paid"),
         advance,
         bookMsg,
-        el("button", { type: "submit", class: "btn-primary" }, "Book this vendor"),
+        el("button", { type: "submit", class: "btn-primary" }, bookButton),
       ),
     );
+    if (alreadyBooked) card.querySelector(".book-form").replaceWith(el("p", { class: "verdict-done" }, alreadyBooked));
     box.replaceChildren(card);
     $("quote-confirm").replaceChildren();
     $("quote-status").textContent = "";
@@ -2139,8 +2172,37 @@
   }
 
   /** Records the deal: on the timeline task that books this line (so the task ticks too), else as a line cost. */
+  const norm = (x) =>
+    String(x || "")
+      .trim()
+      .toLowerCase();
+  /** The tracked vendor with this name for this budget line, if any. */
+  function trackedVendor(lineKey, name) {
+    const cat = state.plan?.vendors.find((v) => v.line === lineKey);
+    return cat && name ? (state.vendorList || []).find((v) => v.cat === cat.key && norm(v.name) === norm(name)) : undefined;
+  }
+  /**
+   * What booking this quote would do: update this vendor's own booking, add a new one
+   * (a free booking slot exists), or replace an existing booking on the line.
+   */
+  function bookingPlan(lineKey, name) {
+    const mine = trackedVendor(lineKey, name);
+    const own = mine && mine.status === "confirmed" && mine.booking ? mine : null;
+    const tasks = state.plan.timeline.tasks.filter((t) => t.books === lineKey);
+    const ownDeal = own ? (own.booking.taskId ? state.deals[own.booking.taskId] : state.lineCosts[own.booking.lineKey]) : null;
+    if (own && ownDeal) return { kind: "update", vendor: own, deal: ownDeal };
+    if (tasks.length ? tasks.some((t) => !state.deals[t.id]) : !state.lineCosts[lineKey]) return { kind: "new" };
+    const slot = tasks.length ? tasks[0].id : null;
+    const deal = slot ? state.deals[slot] : state.lineCosts[lineKey];
+    const holder = (state.vendorList || []).find(
+      (v) => v.status === "confirmed" && v.booking && (slot ? v.booking.taskId === slot : v.booking.lineKey === lineKey),
+    );
+    return { kind: "replace", deal, holder };
+  }
+
   function bookVendor(quote, r, advanceINR) {
-    const booking = bookLine(quote.category, { agreedINR: r.trueTotalINR, advanceINR });
+    // Re-booking the same vendor edits their booking; it never adds a second one.
+    const booking = bookLine(quote.category, { agreedINR: r.trueTotalINR, advanceINR }, trackedVendor(quote.category, quote.vendorName));
     state.quotes = (state.quotes || []).map((q) =>
       q.category === quote.category
         ? { ...q, booked: q.vendorName === (quote.vendorName || "Vendor") && q.trueTotalINR === r.trueTotalINR }
