@@ -57,6 +57,24 @@ describe("warnings stay relevant after bookings", () => {
   });
 });
 
+describe("vendor categories link to budget lines", () => {
+  const SERVICE_LINES = ["venue", "catering", "decor", "photo-video", "entertainment", "sound-lighting", "performers", "beauty", "stalls", "cooking", "utensils", "logistics"];
+  it.each(
+    EVENT_TYPES.flatMap((eventType) =>
+      SUB_TYPES[eventType].flatMap((subType) =>
+        eventType === "wedding" ? [[eventType, subType, [...WEDDING_SUB_EVENTS]], [eventType, subType, ["ceremony"]]] : [[eventType, subType, []]],
+      ),
+    ) as [string, string, string[]][],
+  )("%s / %s %j: every service line has a vendor, and every link is real", (eventType, subType, subEvents) => {
+    const plan = buildPlan({ eventType, subType, ...(eventType === "wedding" ? { subEvents } : {}), totalBudgetINR: 5_00_000, guestCount: 200, cityTier: 2, eventDate: "2027-06-01" }, TODAY);
+    const lineKeys = new Set(plan.budget.lines.map((l) => l.key));
+    for (const v of plan.vendors) if (v.line) expect(lineKeys.has(v.line)).toBe(true);
+    const covered = new Set(plan.vendors.map((v) => v.line).filter(Boolean));
+    const missing = plan.budget.lines.map((l) => l.key).filter((k) => SERVICE_LINES.includes(k) && !covered.has(k));
+    expect(missing).toEqual([]);
+  });
+});
+
 describe("completed tasks are never counted as late", () => {
   it("counts only unfinished late tasks", () => {
     const soon = { eventType: "birthday", subType: "kid", totalBudgetINR: 25_000, guestCount: 20, cityTier: 2, eventDate: "2026-10-29" };

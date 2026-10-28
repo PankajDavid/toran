@@ -132,8 +132,21 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 16px 64px; }
 .badge.late { background: #FBE3E7; color: var(--late); }
 .badge.due-soon { background: #FFF1D6; color: var(--soon); }
 details.vendor { border-bottom: 1px solid var(--line); padding: 8px 0; }
-details.vendor summary { cursor: pointer; font-weight: 600; min-height: 32px; }
-details.vendor ul { margin: 6px 0 4px; padding-left: 20px; }
+details.vendor summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+details.vendor summary .v-planned { margin-left: auto; font-weight: 400; color: var(--muted); font-size: .9rem; }
+.v-label { margin: 8px 0 0; font-size: .85rem; color: var(--muted); font-weight: 600; }
+.v-questions { margin: 4px 0 8px; padding-left: 20px; }
+.v-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 8px; }
+.v-item { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #fff; }
+.v-item.s-confirmed { border-color: var(--leaf); box-shadow: inset 4px 0 0 var(--leaf); }
+.v-item.s-not-chosen { opacity: .65; }
+.v-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; align-items: center; }
+.v-who { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.v-phone, .v-note { color: var(--muted); font-size: .9rem; }
+.v-status { min-height: 40px; font: inherit; border-radius: 10px; border: 1px solid var(--line); padding: 4px 8px; background: #fff; }
+.v-item .row-actions { margin-top: 8px; }
+.v-add { margin: 8px 0 4px; }
+.v-add-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; }
 .ideas-block { margin-top: 14px; }
 .ideas-block h3 { margin: 0 0 4px; font-size: 17px; }
 .ideas-block ul { margin: 0; padding-left: 20px; }
@@ -325,3 +338,4 @@ tr.booked th { color: var(--leaf); }
 
 .verdict, .quote-form, #quote-card { scroll-margin-top: 80px; }
 .verdict-total .s.fix { color: var(--leaf); font-weight: 600; }
+.badge.talks { background: #FFF1D6; color: var(--soon); }

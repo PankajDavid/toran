@@ -40,6 +40,8 @@ export function buildPlan(raw: unknown, today: string, rawDeals: unknown = [], r
   const lineKeys = new Set(budget.lines.map((l) => l.key));
   for (const t of timeline.tasks) if (t.books && !lineKeys.has(t.books)) delete t.books;
   const vendors = buildVendorChecklist(input.eventType, selectors);
+  // A vendor is only linked to a budget line this plan actually has.
+  for (const v of vendors) if (v.line && !lineKeys.has(v.line)) delete v.line;
   const spending = reconcileBudget(budget, timeline.tasks, dealsResult.data);
 
   return {
