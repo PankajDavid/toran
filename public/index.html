@@ -58,7 +58,8 @@
     </section>
 
     <!-- Interview -->
-    <section id="interview" class="interview" hidden aria-label="Planning conversation">
+    <section id="interview" class="interview" hidden aria-labelledby="interview-title">
+      <h1 id="interview-title" class="sr-only">Plan your event</h1>
       <div class="chat" id="chat" role="log" aria-live="polite" aria-relevant="additions"></div>
 
       <div class="known" id="known" hidden>
@@ -133,7 +134,7 @@
         </div>
       </nav>
       <div class="grid">
-        <article class="card wide" id="budget-card" role="tabpanel" aria-labelledby="tab-budget-card" tabindex="-1">
+        <div class="card wide" id="budget-card" role="tabpanel" aria-labelledby="tab-budget-card" tabindex="-1">
           <h2 id="budget-title">Budget</h2>
           <p class="card-sub" id="budget-sub"></p>
           <div class="spend-summary" id="spend-summary" hidden aria-live="polite"></div>
@@ -144,21 +145,21 @@
             <tfoot><tr><th scope="row">Total</th><td class="num" id="budget-total"></td><td class="num share">100%</td></tr></tfoot>
           </table>
           <p class="card-note">Amounts are estimates to plan with, and every line adds up to your exact total. Tick a booking in the timeline to record the final price: savings go into the buffer, and overspending comes out of it first.</p>
-        </article>
+        </div>
 
-        <article class="card wide" id="timeline-card" role="tabpanel" aria-labelledby="tab-timeline-card" tabindex="-1">
+        <div class="card wide" id="timeline-card" role="tabpanel" aria-labelledby="tab-timeline-card" tabindex="-1">
           <h2 id="timeline-title">Timeline</h2>
           <p class="card-sub" id="timeline-sub"></p>
           <ol class="tasks" id="tasks"></ol>
-        </article>
+        </div>
 
-        <article class="card wide" id="vendors-card" role="tabpanel" aria-labelledby="tab-vendors-card" tabindex="-1">
+        <div class="card wide" id="vendors-card" role="tabpanel" aria-labelledby="tab-vendors-card" tabindex="-1">
           <h2 id="vendors-title">Vendor checklist</h2>
           <p class="card-sub" id="vendors-sub"></p>
           <div id="vendors" class="vendors"></div>
-        </article>
+        </div>
 
-        <article class="card wide quote-card" id="quote-card" role="tabpanel" aria-labelledby="tab-quote-card" tabindex="-1">
+        <div class="card wide quote-card" id="quote-card" role="tabpanel" aria-labelledby="tab-quote-card" tabindex="-1">
           <h2 id="quote-title">Quote Checker</h2>
           <p class="card-sub">Photograph a vendor's quotation. Toran reads it, you confirm the lines, and plain code checks the maths, GST, minimums, missing items and payment terms.</p>
           <form class="quote-start" id="quote-start">
@@ -177,10 +178,10 @@
           <div id="quote-confirm"></div>
           <div id="quote-verdict" aria-live="polite"></div>
           <div id="quote-saved"></div>
-        </article>
+        </div>
 
 
-        <article class="card wide" id="ideas-card" role="tabpanel" aria-labelledby="tab-ideas-card" tabindex="-1">
+        <div class="card wide" id="ideas-card" role="tabpanel" aria-labelledby="tab-ideas-card" tabindex="-1">
           <h2 id="ideas-title">Ideas</h2>
           <p class="card-sub" id="ideas-sub">Themes, decor and menu ideas for your event.</p>
           <button type="button" class="btn-primary" id="get-ideas">Get ideas</button>
@@ -192,21 +193,21 @@
               <button type="submit" class="btn-quiet">Refine</button>
             </div>
           </form>
-        </article>
+        </div>
 
-        <article class="card wide" id="invitation-card" role="tabpanel" aria-labelledby="tab-invitation-card" tabindex="-1">
+        <div class="card wide" id="invitation-card" role="tabpanel" aria-labelledby="tab-invitation-card" tabindex="-1">
           <h2 id="invitation-title">Invitation</h2>
           <p class="card-sub">Invitation wording for your event, ready to send on WhatsApp.</p>
           <button type="button" class="btn-primary" id="get-invitation">Write my invitation</button>
           <div id="invitation" aria-live="polite"></div>
-        </article>
+        </div>
 
-        <article class="card wide" id="tips-card" role="tabpanel" aria-labelledby="tab-tips-card" tabindex="-1">
+        <div class="card wide" id="tips-card" role="tabpanel" aria-labelledby="tab-tips-card" tabindex="-1">
           <h2 id="tips-title">Tips</h2>
           <p class="card-sub">Practical tips for your kind of event.</p>
           <button type="button" class="btn-primary" id="get-tips">Get tips</button>
           <div id="tips" aria-live="polite"></div>
-        </article>
+        </div>
       </div>
       </div>
     </section>
