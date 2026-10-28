@@ -149,7 +149,9 @@ details.vendor ul { margin: 6px 0 4px; padding-left: 20px; }
 .refine-row input { flex: 1; min-width: 0; min-height: 44px; border: 1.5px solid var(--line); border-radius: 999px; padding: 0 14px; font: inherit; background: var(--cream); }
 
 /* Bookings */
-.spend-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 12px; }
+.spend-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 0 0 12px; }
+.spend-summary > div { min-width: 0; }
+.spend-summary strong { display: block; overflow-wrap: anywhere; line-height: 1.25; }
 .spend-summary div { background: var(--cream); border-radius: 10px; padding: 8px 10px; }
 .spend-summary .k { display: block; font-size: 13px; color: var(--muted); }
 .spend-summary strong { font-variant-numeric: tabular-nums; }
@@ -172,7 +174,7 @@ tr.booked th { color: var(--leaf); }
 .booking-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .task { flex-wrap: wrap; }
 @media (max-width: 520px) { .budget .share { display: none; } .card { padding: 14px; } }
-@media (max-width: 760px) { .spend-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .booking { margin-left: 0; } }
+@media (max-width: 760px) { .booking { margin-left: 0; } }
 
 /* Plan-ready animation */
 .ready {
