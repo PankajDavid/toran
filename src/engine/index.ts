@@ -6,3 +6,4 @@ export * from "./vendors.js";
 export * from "./validate.js";
 export * from "./plan.js";
 export * from "./deals.js";
+export * from "./quote.js";

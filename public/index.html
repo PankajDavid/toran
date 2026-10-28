@@ -119,6 +119,27 @@
           <ol class="tasks" id="tasks"></ol>
         </article>
 
+        <article class="card wide quote-card" id="quote-card" aria-labelledby="quote-title">
+          <h2 id="quote-title">Quote Checker</h2>
+          <p class="card-sub">Photograph a vendor's quotation. Toran reads it, you confirm the lines, and plain code checks the maths, GST, minimums, missing items and payment terms.</p>
+          <form class="quote-start" id="quote-start">
+            <div class="field">
+              <label for="quote-category">What is this quote for?</label>
+              <select id="quote-category" required></select>
+            </div>
+            <div class="quote-actions">
+              <label class="btn-primary file-btn" for="quote-file">Photo or PDF of the quote</label>
+              <input id="quote-file" type="file" accept="image/*,application/pdf" class="sr-only">
+              <button type="button" class="btn-quiet" id="quote-manual">Type it in instead</button>
+            </div>
+            <p class="fineprint-left">The photo is read once and never stored. Location details in the photo are removed before upload.</p>
+          </form>
+          <p class="quote-status" id="quote-status" role="status" aria-live="polite"></p>
+          <div id="quote-confirm"></div>
+          <div id="quote-verdict" aria-live="polite"></div>
+          <div id="quote-saved"></div>
+        </article>
+
         <article class="card" aria-labelledby="vendors-title">
           <h2 id="vendors-title">Vendor checklist</h2>
           <p class="card-sub">Questions to ask before you pay any advance.</p>

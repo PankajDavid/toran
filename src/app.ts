@@ -7,6 +7,9 @@ import { buildPlan, parsePlanInput, PlanInputError, todayInIndia } from "./engin
 import { aiClientFromEnv, type AiClient } from "./ai/client.js";
 import { generateIdeas, IdeasRequestSchema } from "./ai/ideas.js";
 import { runInterviewTurn, TurnSchema } from "./interview/interview.js";
+import { MAX_QUOTE_BYTES, QUOTE_MIME, readQuote, sniffMime, type QuoteMime } from "./ai/quoteReader.js";
+import { checkQuote, QuoteSchema, vendorMessage } from "./engine/quote.js";
+import { z } from "zod";
 
 const OVERRIDE_HEADERS = ["x-http-method-override", "x-http-method", "x-method-override", "x-original-url", "x-rewrite-url"];
 
@@ -21,6 +24,7 @@ export interface AppOptions {
   today?: () => string;
   planRateLimitPerMinute?: number;
   aiRateLimitPerMinute?: number;
+  quoteRateLimitPerMinute?: number;
   /** Injected for tests; production builds one from GEMINI_API_KEY (offline if absent). */
   ai?: AiClient;
 }
@@ -58,7 +62,9 @@ export function createApp(opts: AppOptions = {}) {
   });
 
   app.use(rateLimit({ windowMs: 15 * 60_000, limit: 300, standardHeaders: "draft-8", legacyHeaders: false }));
-  app.use(express.json({ limit: "10kb" }));
+  // Small JSON bodies everywhere, except a confirmed quote (up to 60 lines) which gets 64kb.
+  const smallJson = express.json({ limit: "10kb" });
+  app.use((req, res, next) => (req.path === "/api/quote/check" ? next() : smallJson(req, res, next)));
 
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   // App files (page, script, styles, worker, manifest) must always be checked for a newer
@@ -96,6 +102,71 @@ export function createApp(opts: AppOptions = {}) {
       return;
     }
     res.json(await runInterviewTurn(turn.data, today(), ai));
+  });
+
+  // Reading a quote is the most expensive AI call: its own, tighter limit.
+  const quoteLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: opts.quoteRateLimitPerMinute ?? 8,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: { error: "Too many quotes at once. Please wait a minute and try again." },
+  });
+
+  /**
+   * Reads a quotation photo or PDF into a draft the user confirms.
+   * The file lives only in memory for this request: never written to disk, never logged.
+   */
+  app.post(
+    "/api/quote/read",
+    quoteLimiter,
+    express.raw({ type: [...QUOTE_MIME], limit: MAX_QUOTE_BYTES }),
+    async (req, res) => {
+      const body = req.body;
+      if (!Buffer.isBuffer(body) || body.length === 0) {
+        res.status(415).json({ error: "Please upload a photo (JPG, PNG, WebP) or a PDF of the quotation." });
+        return;
+      }
+      const claimed = String(req.headers["content-type"] ?? "").split(";")[0].trim();
+      const actual = sniffMime(body);
+      if (!actual || actual !== claimed) {
+        res.status(415).json({ error: "That file doesn't look like a photo or PDF. Please try another." });
+        return;
+      }
+      if (!ai.available) {
+        res.status(503).json({ error: "Reading quotes needs the AI, which is offline right now. You can type the lines in instead.", manual: true });
+        return;
+      }
+      try {
+        const result = await readQuote(body, actual as QuoteMime, ai);
+        res.json(result);
+      } catch (err) {
+        const e = err as { kind?: string; detail?: string };
+        console.warn(`Quote read failed (${e.kind ?? "error"}${e.detail ? ` ${e.detail}` : ""})`);
+        res.status(502).json({ error: "Couldn't read this quotation. Try a clearer, well-lit photo, or type the lines in.", manual: true });
+      }
+    },
+  );
+
+  const CheckBody = z.strictObject({
+    quote: QuoteSchema,
+    guestCount: z.number().int().min(1).max(5000),
+    plannedINR: z.number().int().min(0).max(5_00_00_000).optional(),
+  });
+
+  /** Runs every check on a quote the user has confirmed. Plain code, no AI. */
+  app.post("/api/quote/check", aiLimiter, express.json({ limit: "64kb" }), (req, res) => {
+    const parsed = CheckBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "Please check the quote lines.",
+        issues: parsed.error.issues.slice(0, 5).map((i) => ({ field: i.path.join("."), message: i.message })),
+      });
+      return;
+    }
+    const { quote, guestCount, plannedINR } = parsed.data;
+    const check = checkQuote(quote, { guestCount, plannedINR });
+    res.json({ ...check, message: vendorMessage(check.questions, quote.vendorName) });
   });
 
   app.post("/api/ideas", aiLimiter, async (req, res) => {
