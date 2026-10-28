@@ -48,7 +48,9 @@
         <li><strong>Timeline</strong><span>Every task dated back from your event day.</span></li>
         <li><strong>Vendors</strong><span>Find real vendors on Google Maps, track and confirm them.</span></li>
         <li><strong>Quote Checker</strong><span>Photograph a quote: catch maths, GST and hidden-cost traps.</span></li>
-        <li><strong>Ideas</strong><span>Themes, decor, menu and invitation wording.</span></li>
+        <li><strong>Ideas</strong><span>Themes, decor and menu that suit your event.</span></li>
+        <li><strong>Invitation</strong><span>Wording ready to send on WhatsApp.</span></li>
+        <li><strong>Tips</strong><span>Practical tips for your kind of event.</span></li>
       </ul>
       <p class="fineprint">Every number is calculated by code, never guessed by AI. Nothing you type is stored on our server.</p>
     </section>
@@ -90,7 +92,7 @@
           <button type="button" class="btn-quiet" id="copy-link">Copy plan link</button>
           <button type="button" class="btn-quiet" id="save-pdf">Save as PDF</button>
         </div>
-        <p class="share-note" id="share-note" role="status">Your plan lives on this phone. The plan link carries a copy of it, so anyone you send it to can open it. Our server never stores it.</p>
+        <p class="share-note" id="share-note" role="status" hidden>Your plan lives on this device. The plan link carries a copy of it, so anyone you send it to can open it. Our server never stores it.</p>
       </div>
 
       <aside class="install" id="install" hidden aria-labelledby="install-title">
@@ -108,16 +110,18 @@
 
       <div class="plan-body">
       <nav class="plan-nav" id="plan-nav" aria-label="Plan sections">
-        <ul>
-          <li><a href="#budget-card" data-sec="budget-card"><span class="nav-name">Budget</span><span class="nav-stat" id="nav-budget"></span></a></li>
-          <li><a href="#timeline-card" data-sec="timeline-card"><span class="nav-name">Timeline</span><span class="nav-stat" id="nav-timeline"></span></a></li>
-          <li><a href="#vendors-card" data-sec="vendors-card"><span class="nav-name">Vendors</span><span class="nav-stat" id="nav-vendors"></span></a></li>
-          <li><a href="#quote-card" data-sec="quote-card"><span class="nav-name">Quote Checker</span><span class="nav-stat" id="nav-quotes"></span></a></li>
-          <li><a href="#ideas-card" data-sec="ideas-card"><span class="nav-name">Ideas</span><span class="nav-stat" id="nav-ideas"></span></a></li>
-        </ul>
+        <div role="tablist" aria-label="Plan sections" id="plan-tabs">
+          <button type="button" role="tab" id="tab-budget-card" aria-controls="budget-card" aria-selected="false" tabindex="-1" data-sec="budget-card"><span class="nav-name">Budget</span><span class="nav-stat" id="nav-budget"></span></button>
+          <button type="button" role="tab" id="tab-timeline-card" aria-controls="timeline-card" aria-selected="false" tabindex="-1" data-sec="timeline-card"><span class="nav-name">Timeline</span><span class="nav-stat" id="nav-timeline"></span></button>
+          <button type="button" role="tab" id="tab-vendors-card" aria-controls="vendors-card" aria-selected="false" tabindex="-1" data-sec="vendors-card"><span class="nav-name">Vendors</span><span class="nav-stat" id="nav-vendors"></span></button>
+          <button type="button" role="tab" id="tab-quote-card" aria-controls="quote-card" aria-selected="false" tabindex="-1" data-sec="quote-card"><span class="nav-name">Quote Checker</span><span class="nav-stat" id="nav-quotes"></span></button>
+          <button type="button" role="tab" id="tab-ideas-card" aria-controls="ideas-card" aria-selected="false" tabindex="-1" data-sec="ideas-card"><span class="nav-name">Ideas</span><span class="nav-stat" id="nav-ideas"></span></button>
+          <button type="button" role="tab" id="tab-invitation-card" aria-controls="invitation-card" aria-selected="false" tabindex="-1" data-sec="invitation-card"><span class="nav-name">Invitation</span><span class="nav-stat" id="nav-invitation"></span></button>
+          <button type="button" role="tab" id="tab-tips-card" aria-controls="tips-card" aria-selected="false" tabindex="-1" data-sec="tips-card"><span class="nav-name">Tips</span><span class="nav-stat" id="nav-tips"></span></button>
+        </div>
       </nav>
       <div class="grid">
-        <article class="card" id="budget-card" aria-labelledby="budget-title">
+        <article class="card wide" id="budget-card" role="tabpanel" aria-labelledby="tab-budget-card" tabindex="-1">
           <h2 id="budget-title">Budget</h2>
           <p class="card-sub" id="budget-sub"></p>
           <div class="spend-summary" id="spend-summary" hidden aria-live="polite"></div>
@@ -130,19 +134,19 @@
           <p class="card-note">Amounts are estimates to plan with, and every line adds up to your exact total. Tick a booking in the timeline to record the final price: savings go into the buffer, and overspending comes out of it first.</p>
         </article>
 
-        <article class="card" id="timeline-card" aria-labelledby="timeline-title">
+        <article class="card wide" id="timeline-card" role="tabpanel" aria-labelledby="tab-timeline-card" tabindex="-1">
           <h2 id="timeline-title">Timeline</h2>
           <p class="card-sub" id="timeline-sub"></p>
           <ol class="tasks" id="tasks"></ol>
         </article>
 
-        <article class="card wide" id="vendors-card" aria-labelledby="vendors-title">
+        <article class="card wide" id="vendors-card" role="tabpanel" aria-labelledby="tab-vendors-card" tabindex="-1">
           <h2 id="vendors-title">Vendor checklist</h2>
           <p class="card-sub" id="vendors-sub"></p>
           <div id="vendors" class="vendors"></div>
         </article>
 
-        <article class="card wide quote-card" id="quote-card" aria-labelledby="quote-title">
+        <article class="card wide quote-card" id="quote-card" role="tabpanel" aria-labelledby="tab-quote-card" tabindex="-1">
           <h2 id="quote-title">Quote Checker</h2>
           <p class="card-sub">Photograph a vendor's quotation. Toran reads it, you confirm the lines, and plain code checks the maths, GST, minimums, missing items and payment terms.</p>
           <form class="quote-start" id="quote-start">
@@ -164,9 +168,9 @@
         </article>
 
 
-        <article class="card" id="ideas-card" aria-labelledby="ideas-title">
+        <article class="card wide" id="ideas-card" role="tabpanel" aria-labelledby="tab-ideas-card" tabindex="-1">
           <h2 id="ideas-title">Ideas</h2>
-          <p class="card-sub" id="ideas-sub">Themes, decor, menu and invitation wording for your event.</p>
+          <p class="card-sub" id="ideas-sub">Themes, decor and menu ideas for your event.</p>
           <button type="button" class="btn-primary" id="get-ideas">Get ideas</button>
           <div id="ideas" aria-live="polite"></div>
           <form class="refine" id="refine" hidden>
@@ -176,6 +180,20 @@
               <button type="submit" class="btn-quiet">Refine</button>
             </div>
           </form>
+        </article>
+
+        <article class="card wide" id="invitation-card" role="tabpanel" aria-labelledby="tab-invitation-card" tabindex="-1">
+          <h2 id="invitation-title">Invitation</h2>
+          <p class="card-sub">Invitation wording for your event, ready to send on WhatsApp.</p>
+          <button type="button" class="btn-primary" id="get-invitation">Write my invitation</button>
+          <div id="invitation" aria-live="polite"></div>
+        </article>
+
+        <article class="card wide" id="tips-card" role="tabpanel" aria-labelledby="tab-tips-card" tabindex="-1">
+          <h2 id="tips-title">Tips</h2>
+          <p class="card-sub">Practical tips for your kind of event.</p>
+          <button type="button" class="btn-primary" id="get-tips">Get tips</button>
+          <div id="tips" aria-live="polite"></div>
         </article>
       </div>
       </div>

@@ -578,6 +578,7 @@
     renderQuoteStart();
     updateInstall();
     renderNav();
+    showSection(state.tab || SECTIONS[0]);
   }
 
   /* ---------- sections menu ---------- */
@@ -599,35 +600,42 @@
     const q = (state.quotes || []).length;
     setStat("nav-quotes", q ? `${q} saved` : "check a quote");
     setStat("nav-ideas", state.ideas ? "ready" : "get ideas");
-    updateActiveNav();
+    setStat("nav-invitation", state.ideas && state.ideas.ideas.invitation ? "ready" : "write one");
+    setStat("nav-tips", state.ideas && state.ideas.ideas.tips.length ? `${state.ideas.ideas.tips.length} tips` : "get tips");
   }
 
-  // Highlights the section on screen in the menu.
-  const navLinks = [...document.querySelectorAll("#plan-nav a")];
-  // The active section is the last one whose top has passed under the menu;
-  // cards side by side (same top) count as one row, and the first of them wins.
-  let navTick = false;
-  function updateActiveNav() {
-    navTick = false;
-    const line = innerWidth >= 1100 ? 120 : 170;
-    let active = navLinks[0] && navLinks[0].dataset.sec, activeTop = -Infinity;
-    for (const a of navLinks) {
-      const t = $(a.dataset.sec);
-      if (!t) continue;
-      const top = Math.round(t.getBoundingClientRect().top);
-      if (top <= line && top > activeTop + 8) { active = a.dataset.sec; activeTop = top; }
+  /* One section at a time: the menu works as tabs (arrow keys move between them). */
+  const tabs = [...document.querySelectorAll('#plan-tabs [role="tab"]')];
+  const SECTIONS = tabs.map((t) => t.dataset.sec);
+  function showSection(sec, { focus = false } = {}) {
+    if (!SECTIONS.includes(sec)) sec = SECTIONS[0];
+    if (state.tab !== sec) { state.tab = sec; save(); }
+    for (const t of tabs) {
+      const on = t.dataset.sec === sec;
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+      $(t.dataset.sec).hidden = !on;
     }
-    navLinks.forEach((a) => a.setAttribute("aria-current", a.dataset.sec === active ? "true" : "false"));
+    const tab = tabs.find((t) => t.dataset.sec === sec);
+    if (focus && tab) tab.focus();
   }
-  addEventListener("scroll", () => { if (!navTick) { navTick = true; requestAnimationFrame(updateActiveNav); } }, { passive: true });
-  navLinks.forEach((a) => a.addEventListener("click", (e) => {
-    const t = $(a.dataset.sec);
-    if (!t) return;
-    e.preventDefault();
-    t.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-    const h = t.querySelector("h2");
-    if (h) { h.setAttribute("tabindex", "-1"); h.focus({ preventScroll: true }); }
-  }));
+  tabs.forEach((t, i) => {
+    t.addEventListener("click", () => {
+      showSection(t.dataset.sec);
+      // On phones, bring the chosen section's top into view under the sticky strip.
+      if (innerWidth < 1100 && $("plan-nav").getBoundingClientRect().top < 60) $(t.dataset.sec).scrollIntoView({ block: "start" });
+    });
+    t.addEventListener("keydown", (e) => {
+      const keys = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+      let n = null;
+      if (e.key in keys) n = (i + keys[e.key] + tabs.length) % tabs.length;
+      else if (e.key === "Home") n = 0;
+      else if (e.key === "End") n = tabs.length - 1;
+      if (n === null) return;
+      e.preventDefault();
+      showSection(tabs[n].dataset.sec, { focus: true });
+    });
+  });
 
   /* ---------- ideas ---------- */
   function renderIdeas() {
@@ -636,6 +644,10 @@
     const r = state.ideas;
     $("get-ideas").hidden = !!r;
     $("refine").hidden = !r;
+    $("get-invitation").hidden = !!r;
+    $("get-tips").hidden = !!r;
+    $("invitation").replaceChildren();
+    $("tips").replaceChildren();
     if (!r) return;
     const i = r.ideas;
     if (i.themes.length) {
@@ -650,23 +662,25 @@
         i.menu.map((c) => el("div", null, el("strong", null, c.course), el("ul", null, c.items.map((x) => el("li", null, x)))))));
     }
     if (i.invitation) {
-      box.append(el("div", { class: "ideas-block" }, el("h3", null, "Invitation wording"),
+      $("invitation").append(el("div", { class: "ideas-block" },
         el("p", { class: "invitation" }, i.invitation),
         el("div", { class: "row-actions" },
           el("a", { class: "btn-primary btn-link", href: whatsappUrl(i.invitation), target: "_blank", rel: "noopener" }, "Send on WhatsApp"),
           el("button", { type: "button", class: "btn-quiet", onclick: (e) => copyText(i.invitation, e.currentTarget) }, "Copy"))));
     }
-    if (i.tips.length) box.append(el("div", { class: "ideas-block" }, el("h3", null, "Tips"), el("ul", null, i.tips.map((t) => el("li", null, t)))));
+    if (i.tips.length) $("tips").append(el("ul", { class: "tips-list" }, i.tips.map((t) => el("li", null, t))));
+    else $("tips").append(el("p", { class: "source-note" }, "No tips this time. Try refining in Ideas."));
+    if (!i.invitation) $("invitation").append(el("p", { class: "source-note" }, "No invitation wording this time. Try refining in Ideas."));
     const notes = [];
     if (r.source === "offline") notes.push("These come from our curated set because the AI is offline right now.");
     if (r.removed) notes.push(`${r.removed} AI suggestion${r.removed === 1 ? " was" : "s were"} removed by our checks (prices, or food that doesn't fit your diet).`);
     if (notes.length) box.append(el("p", { class: "source-note" }, notes.join(" ")));
   }
 
+  const IDEA_BUTTONS = [["get-ideas", "Get ideas"], ["get-invitation", "Write my invitation"], ["get-tips", "Get tips"]];
   async function loadIdeas(refine) {
-    const btn = $("get-ideas");
-    btn.disabled = true;
-    btn.textContent = "Thinking up ideas… (about 10 seconds)";
+    // One AI call makes ideas, invitation and tips together; every button shows it working.
+    for (const [id] of IDEA_BUTTONS) { $(id).disabled = true; $(id).textContent = "Working on it… (about 10 seconds)"; }
     const box = $("ideas");
     if (refine) box.prepend(el("p", { class: "source-note" }, "Refining…"));
     try {
@@ -675,13 +689,14 @@
     } catch (err) {
       box.prepend(el("p", { class: "warning" }, err.status === 429 ? "Too many requests. Please wait a minute." : "Couldn't get ideas just now. Please try again."));
     } finally {
-      btn.disabled = false;
-      btn.textContent = "Get ideas";
+      for (const [id, label] of IDEA_BUTTONS) { $(id).disabled = false; $(id).textContent = label; }
       renderIdeas();
       renderNav();
     }
   }
   $("get-ideas").addEventListener("click", () => loadIdeas());
+  $("get-invitation").addEventListener("click", () => loadIdeas());
+  $("get-tips").addEventListener("click", () => loadIdeas());
   $("refine").addEventListener("submit", (e) => {
     e.preventDefault();
     const t = $("refine-text").value.trim();
@@ -948,7 +963,8 @@
     $("quote-verdict").replaceChildren();
     $("quote-confirm").replaceChildren();
     $("quote-status").textContent = `Checking a quote from ${v.name}. Add a photo or PDF, or type it in.`;
-    $("quote-card").scrollIntoView({ behavior: "smooth", block: "start" });
+    showSection("quote-card");
+    $("quote-card").scrollIntoView({ block: "start" });
     $("quote-file").focus({ preventScroll: true });
   }
 
@@ -1378,10 +1394,13 @@
     return lines.join("\n");
   }
 
+  // The privacy note appears when it matters: the moment someone shares the plan.
+  const showShareNote = () => { $("share-note").hidden = false; };
   $("share-wa").addEventListener("click", () => {
+    showShareNote();
     window.open(whatsappUrl(planSummary()), "_blank", "noopener");
   });
-  $("copy-link").addEventListener("click", (e) => copyText(planLink(), e.currentTarget));
+  $("copy-link").addEventListener("click", (e) => { showShareNote(); copyText(planLink(), e.currentTarget); });
   $("save-pdf").addEventListener("click", () => window.print());
   // Closed sections don't print, so open them for the PDF and restore afterwards.
   let reopened = [];
@@ -1460,7 +1479,9 @@
   function updateInstall() {
     let dismissed = false;
     try { dismissed = localStorage.getItem("toran.installDismissed") === "1"; } catch { /* ignore */ }
-    const show = !!state.plan && !isStandalone() && !dismissed;
+    // Only on phones/tablets: that's where browsers clear storage and a home-screen icon helps.
+    const phone = matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) <= 900;
+    const show = !!state.plan && phone && !isStandalone() && !dismissed;
     $("install").hidden = !show;
     if (!show) return;
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
