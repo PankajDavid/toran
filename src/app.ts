@@ -61,7 +61,18 @@ export function createApp(opts: AppOptions = {}) {
   app.use(express.json({ limit: "10kb" }));
 
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  app.use(express.static(path.join(__dirname, "..", "public"), { index: "index.html", maxAge: "1h" }));
+  // App files (page, script, styles, worker, manifest) must always be checked for a newer
+  // version, so updates appear on the next open. "no-cache" still lets the browser reuse
+  // its copy when unchanged (a tiny 304 reply). Images and icons rarely change: keep 1 day.
+  app.use(
+    express.static(path.join(__dirname, "..", "public"), {
+      index: "index.html",
+      setHeaders(res, filePath) {
+        if (/\.(html|js|css|webmanifest)$/.test(filePath)) res.setHeader("Cache-Control", "no-cache");
+        else res.setHeader("Cache-Control", "public, max-age=86400");
+      },
+    }),
+  );
 
   app.get("/health", (_req, res) => {
     // Reports whether AI is configured, never the key itself.

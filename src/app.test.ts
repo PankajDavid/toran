@@ -97,6 +97,13 @@ describe("HTTP API", () => {
     expect(res.headers.get("content-security-policy")).toContain("default-src 'self'");
   });
 
+  it("app files are always revalidated so updates show on the next open", async () => {
+    for (const f of ["/", "/app.js", "/app.css", "/sw.js", "/manifest.webmanifest"]) {
+      expect((await fetch(`${base}${f}`)).headers.get("cache-control")).toBe("no-cache");
+    }
+    expect((await fetch(`${base}/favicon.svg`)).headers.get("cache-control")).toContain("max-age=86400");
+  });
+
   it("ignores method-override headers", async () => {
     const res = await fetch(`${base}/api/plan`, { method: "GET", headers: { "x-http-method-override": "POST" } });
     expect(res.status).toBe(404);
