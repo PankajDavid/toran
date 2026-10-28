@@ -10,6 +10,7 @@ import { runInterviewTurn, TurnSchema } from "./interview/interview.js";
 import { MAX_QUOTE_BYTES, QUOTE_MIME, readQuote, sniffMime, type QuoteMime } from "./ai/quoteReader.js";
 import { checkQuote, QuoteSchema, vendorMessage } from "./engine/quote.js";
 import { z } from "zod";
+import { FindVendorsSchema, placesClientFromEnv, type PlacesClient } from "./places/places.js";
 
 const OVERRIDE_HEADERS = ["x-http-method-override", "x-http-method", "x-method-override", "x-original-url", "x-rewrite-url"];
 
@@ -27,11 +28,15 @@ export interface AppOptions {
   quoteRateLimitPerMinute?: number;
   /** Injected for tests; production builds one from GEMINI_API_KEY (offline if absent). */
   ai?: AiClient;
+  /** Injected for tests; production builds one from GOOGLE_MAPS_API_KEY (offline if absent). */
+  places?: PlacesClient;
+  placesRateLimitPerMinute?: number;
 }
 
 export function createApp(opts: AppOptions = {}) {
   const today = opts.today ?? (() => todayInIndia());
   const ai = opts.ai ?? aiClientFromEnv();
+  const places = opts.places ?? placesClientFromEnv();
   const app = express();
 
   app.use(stripOverrideHeaders);
@@ -82,7 +87,7 @@ export function createApp(opts: AppOptions = {}) {
 
   app.get("/health", (_req, res) => {
     // Reports whether AI is configured, never the key itself.
-    res.json({ status: "ok", ai: ai.available ? "configured" : "offline" });
+    res.json({ status: "ok", ai: ai.available ? "configured" : "offline", places: places.available ? "configured" : "offline" });
   });
 
   // Every endpoint that can trigger an AI call gets this stricter limit, so
@@ -185,6 +190,35 @@ export function createApp(opts: AppOptions = {}) {
         return;
       }
       throw err;
+    }
+  });
+
+  // Each Places search costs money: a tight per-IP limit (and a daily cap in Google Cloud).
+  const placesLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: opts.placesRateLimitPerMinute ?? 10,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: { error: "Too many searches. Please wait a minute and try again." },
+  });
+
+  /** Real vendors from Google Maps for one category. Nothing is stored or logged. */
+  app.post("/api/vendors/find", placesLimiter, async (req, res) => {
+    const parsed = FindVendorsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Please enter a city name." });
+      return;
+    }
+    if (!places.available) {
+      res.status(503).json({ error: "Vendor search isn't switched on yet. You can still add vendors you know." });
+      return;
+    }
+    try {
+      res.json({ vendors: await places.search(parsed.data), source: "Google Maps" });
+    } catch (err) {
+      const e = err as { kind?: string; detail?: string };
+      console.warn(`Places search failed (${e.kind ?? "error"}${e.detail ? ` ${e.detail}` : ""})`);
+      res.status(502).json({ error: "Couldn't search Google Maps just now. Please try again in a minute." });
     }
   });
 

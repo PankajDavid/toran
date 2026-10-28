@@ -22,7 +22,7 @@ describe("HTTP API", () => {
   it("health check works", async () => {
     const res = await fetch(`${base}/health`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: "ok", ai: "offline" });
+    expect(await res.json()).toEqual({ status: "ok", ai: "offline", places: "offline" });
   });
 
   it("interview works end to end without AI: one Hinglish sentence plus button taps", async () => {

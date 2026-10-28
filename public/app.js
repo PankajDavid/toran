@@ -641,10 +641,10 @@
   // Per category: the questions to ask, plus the vendors you're talking to and where
   // each one stands. Confirming a vendor books their price on the matching budget line.
   const VSTATUS = [
-    ["contacted", "Contacted"], ["quote", "Quote received"], ["shortlisted", "Shortlisted"],
+    ["to-contact", "To contact"], ["contacted", "Contacted"], ["quote", "Quote received"], ["shortlisted", "Shortlisted"],
     ["confirmed", "Confirmed"], ["not-chosen", "Not chosen"],
   ];
-  const VRANK = { contacted: 0, quote: 1, shortlisted: 2, confirmed: 3, "not-chosen": -1 };
+  const VRANK = { "to-contact": 0, contacted: 1, quote: 2, shortlisted: 3, confirmed: 4, "not-chosen": -1 };
   const MAX_VENDORS = 60;
   const openVendorCats = new Set();
 
@@ -714,6 +714,7 @@
         el("p", { class: "v-label" }, "Ask before paying any advance"),
         el("ul", { class: "v-questions" }, c.questions.map((q) => el("li", null, q))),
         mine.length ? el("ul", { class: "v-list", "aria-label": `${c.category} vendors` }, mine.map((v) => vendorRow(v, c, line))) : null,
+        findBox(c),
         addVendorForm(c));
       det.addEventListener("toggle", () => { if (det.open) openVendorCats.add(c.key); else openVendorCats.delete(c.key); });
       return det;
@@ -762,6 +763,7 @@
     const phone = el("input", { id: phoneId, type: "tel", maxlength: "18", autocomplete: "off", placeholder: "optional" });
     const msg = el("p", { class: "booking-msg", role: "alert" });
     const form = el("form", { class: "v-add" },
+      el("p", { class: "v-label" }, "Or add one you know"),
       el("div", { class: "v-add-fields" },
         el("div", { class: "field" }, el("label", { for: nameId }, "Vendor name"), name),
         el("div", { class: "field" }, el("label", { for: phoneId }, "Phone"), phone)),
@@ -783,6 +785,78 @@
       if (again) again.focus();
     });
     return form;
+  }
+
+  /* Find vendors near you: real Google Maps listings, kept in memory only (not saved). */
+  const found = new Map(); // category key -> { where, vendors } | { error }
+  let lastFind = 0;
+
+  function findBox(c) {
+    const k = state.plan.input;
+    const box = el("div", { class: "v-find" });
+    const res = found.get(c.key);
+    const cityId = `vc-${c.key}`;
+    const cityInput = el("input", { id: cityId, type: "text", maxlength: "60", autocomplete: "address-level2", placeholder: "e.g. Panchkula", value: k.city || null });
+    const status = el("p", { class: "v-find-status", role: "status" });
+    const run = async (body, where) => {
+      const now = Date.now();
+      if (now - lastFind < MIN_GAP_MS) return;
+      lastFind = now;
+      status.textContent = "Searching Google Maps…";
+      try {
+        const r = await api("/api/vendors/find", { category: c.key, ...body });
+        found.set(c.key, { where, vendors: r.vendors });
+      } catch (err) {
+        found.set(c.key, { error: (err.data && err.data.error) || "Couldn't search just now. Please try again." });
+      }
+      openVendorCats.add(c.key);
+      renderVendors();
+    };
+    box.append(
+      el("p", { class: "v-label" }, "Find on Google Maps"),
+      el("form", { class: "v-find-form", onsubmit: (e) => {
+        e.preventDefault();
+        const city = cityInput.value.trim();
+        if (!/^[\p{L} .'-]{2,60}$/u.test(city)) { status.textContent = "Enter a city name, like Panchkula."; cityInput.focus(); return; }
+        run({ city }, city);
+      } },
+        el("label", { class: "sr-only", for: cityId }, "City to search in"),
+        cityInput,
+        el("button", { type: "submit", class: "btn-quiet" }, "Search"),
+        "geolocation" in navigator ? el("button", { type: "button", class: "btn-quiet", onclick: () => {
+          status.textContent = "Getting your location…";
+          navigator.geolocation.getCurrentPosition(
+            // Rounded on this phone to about 1 km before it leaves; used once and never saved.
+            (pos) => run({ near: { lat: Math.round(pos.coords.latitude * 100) / 100, lng: Math.round(pos.coords.longitude * 100) / 100 } }, "near you"),
+            () => { status.textContent = "Location isn't available. Type your city instead."; },
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
+        } }, "Near me") : null),
+      status);
+    if (res && res.error) status.textContent = res.error;
+    else if (res) {
+      const mine = new Set((state.vendorList || []).filter((v) => v.cat === c.key).map((v) => v.name.trim().toLowerCase()));
+      box.append(
+        res.vendors.length ? el("ul", { class: "v-found", "aria-label": `Google Maps results ${res.where}` }, res.vendors.map((f) => {
+          const added = mine.has(f.name.trim().toLowerCase());
+          return el("li", { class: "v-found-item" },
+            el("div", { class: "v-who" },
+              el("strong", null, f.name),
+              f.rating !== undefined ? el("span", { class: "v-note" }, `★ ${f.rating}${f.ratingCount !== undefined ? ` (${f.ratingCount.toLocaleString("en-IN")} reviews)` : ""}`) : null,
+              f.address ? el("span", { class: "v-phone" }, f.address) : null),
+            el("div", { class: "row-actions" },
+              f.phone ? el("a", { class: "btn-quiet btn-link", href: `tel:${f.phone.replace(/[^\d+]/g, "")}` }, "Call") : null,
+              el("a", { class: "btn-quiet btn-link", href: f.mapsUrl, target: "_blank", rel: "noopener" }, "Open in Maps"),
+              el("button", { type: "button", class: added ? "btn-quiet" : "btn-primary", disabled: added, onclick: () => {
+                const list = state.vendorList || (state.vendorList = []);
+                if (list.length >= MAX_VENDORS) return;
+                list.push({ id: "v" + Date.now().toString(36), cat: c.key, name: f.name.slice(0, 60), phone: (f.phone && cleanPhone(f.phone)) || "", status: "to-contact" });
+                save();
+                renderVendors();
+              } }, added ? "In your list" : "Add to my list")));
+        })) : el("p", { class: "v-find-status" }, `No listings found ${res.where === "near you" ? "near you" : "in " + res.where}. Try a nearby bigger city.`),
+        el("p", { class: "fineprint-left" }, "Listings and ratings from Google Maps. Toran doesn't vouch for any vendor: check reviews, visit, and get a written quote."));
+    }
+    return box;
   }
 
   function checkVendorQuote(v, c) {
