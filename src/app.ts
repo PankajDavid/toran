@@ -31,6 +31,8 @@ export interface AppOptions {
   /** Injected for tests; production builds one from GOOGLE_MAPS_API_KEY (offline if absent). */
   places?: PlacesClient;
   placesRateLimitPerMinute?: number;
+  /** Overall API requests per IP per 15 minutes (default 300). Raised only for browser tests. */
+  apiRateLimitPer15Min?: number;
 }
 
 export function createApp(opts: AppOptions = {}) {
@@ -68,7 +70,10 @@ export function createApp(opts: AppOptions = {}) {
 
   // Overall cap per IP on the API. Static files (page, scripts, icons) are not counted:
   // one page load fetches about 20 of them, and they cost nothing to serve.
-  app.use(["/api", "/health"], rateLimit({ windowMs: 15 * 60_000, limit: 300, standardHeaders: "draft-8", legacyHeaders: false }));
+  app.use(
+    ["/api", "/health"],
+    rateLimit({ windowMs: 15 * 60_000, limit: opts.apiRateLimitPer15Min ?? 300, standardHeaders: "draft-8", legacyHeaders: false }),
+  );
   // Small JSON bodies everywhere, except a confirmed quote (up to 60 lines) which gets 64kb.
   const smallJson = express.json({ limit: "10kb" });
   app.use((req, res, next) => (req.path === "/api/quote/check" ? next() : smallJson(req, res, next)));

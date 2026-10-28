@@ -56,13 +56,16 @@ We also tried Gemini's Google Search grounding for live market prices. Productio
 
 ```bash
 npm install
-npm test          # 314 tests across 9 files
+npm test          # 320 unit and API tests
 npm run typecheck
 npm run lint      # Biome: lint + format check (TypeScript, browser JS, CSS)
 npm run check     # all three, as CI runs on every push
+npm run test:e2e  # 30 browser tests (Playwright) on a phone and a desktop screen
 ```
 
-Tests cover the budget (every line adds up to the exact total for every event type), timeline, bookings and re-balancing, the quote checks, suggestions (every rupee figure traced to the plan), the calendar file format, the interview parser, idea sanitising, Places result filtering and the HTTP API (validation, upload checks, offline fallbacks). AI is faked through an injected `AiClient`. After tests pass we deliberately break the code to confirm a test fails.
+Tests cover the budget (every line adds up to the exact total for every event type), timeline, bookings and re-balancing, the quote checks, suggestions (every rupee figure traced to the plan), the calendar file format, the interview parser, idea sanitising, Places result filtering and the HTTP API (validation, upload checks, offline fallbacks). AI is faked through an injected `AiClient`.
+
+Browser tests (`e2e/`) drive the real app on a phone and a desktop screen: the Hinglish interview, exact budget totals, tabs and keyboard navigation, bookings, Toran suggests, the calendar file, Google Maps search (fake listings, no key needed), the Quote Checker, never booking a vendor twice, backup and restore, the plan link, no horizontal scrolling, and an axe accessibility scan of every screen. After tests pass we deliberately break the code to confirm a test fails.
 
 ## Accessibility
 
