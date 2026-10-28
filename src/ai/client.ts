@@ -25,26 +25,10 @@ export interface AiJsonRequest {
   timeoutMs?: number;
 }
 
-export interface WebSource {
-  url: string;
-  title: string;
-}
-
-export interface GroundedResult {
-  /** Parsed JSON (unknown shape — callers MUST validate). */
-  json: unknown;
-  /** Pages Google Search returned for this answer. Empty = nothing to cite. */
-  sources: WebSource[];
-  /** The searches Google ran, shown as "search on Google" links. */
-  searchQueries: string[];
-}
-
 export interface AiClient {
   readonly available: boolean;
   /** Returns parsed JSON (unknown shape — callers MUST validate). Throws AiError on any failure. */
   generateJson(req: AiJsonRequest): Promise<unknown>;
-  /** Same, but the model may use Google Search; returns the pages it used. Optional: fakes may omit it. */
-  generateGrounded?(req: AiJsonRequest): Promise<GroundedResult>;
 }
 
 export class AiError extends Error {
@@ -80,12 +64,6 @@ export function createGeminiClient(opts: GeminiOptions): AiClient {
     fast: opts.fastModel || "gemini-3.5-flash-lite",
   };
 
-  /** Pulls JSON out of a reply that may wrap it in ``` fences or prose. */
-  const parseLoose = (text: string): unknown => {
-    const m = /\{[\s\S]*\}/.exec(text);
-    if (!m) throw new AiError("bad-output", "No JSON in AI response");
-    try { return JSON.parse(m[0]); } catch { throw new AiError("bad-output", "AI response was not valid JSON"); }
-  };
   const upstream = (err: unknown) => {
     const e = err as { status?: number; message?: string };
     const statusWord = /\b(NOT_FOUND|PERMISSION_DENIED|UNAUTHENTICATED|INVALID_ARGUMENT|RESOURCE_EXHAUSTED|FAILED_PRECONDITION|UNAVAILABLE)\b/.exec(e?.message ?? "")?.[1];
@@ -94,44 +72,6 @@ export function createGeminiClient(opts: GeminiOptions): AiClient {
 
   return {
     available: true,
-    async generateGrounded(req) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), req.timeoutMs ?? 30_000);
-      // Plain-text mode: grounding is most reliable without a forced JSON format, so the
-      // system prompt asks for JSON and we pull it out of the text (then validate it).
-      try {
-        const res = await genai.models.generateContent({
-          model: models[req.tier ?? "smart"],
-          contents: [{ role: "user", parts: req.parts }],
-          config: {
-            ...(req.system ? { systemInstruction: req.system } : {}),
-            tools: [{ googleSearch: {} }],
-            // No thinking override by default: low thinking made the model skip searching.
-            ...(req.thinking ? { thinkingConfig: { thinkingLevel: req.thinking === "minimal" ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW } } : {}),
-            abortSignal: controller.signal,
-          },
-        });
-        const text = res.text;
-        if (!text) throw new AiError("bad-output", "Empty AI response");
-        const cand = res.candidates?.[0];
-        const meta = cand?.groundingMetadata ?? res.candidates?.find((c) => c.groundingMetadata)?.groundingMetadata;
-        // Shape only (key names and counts), never content: to see where search results land.
-        console.log(`Grounding shape (${models[req.tier ?? "smart"]}): candidates=${res.candidates?.length ?? 0} finish=${cand?.finishReason ?? "-"} meta=${meta ? Object.keys(meta).join("+") || "empty" : "none"} chunks=${meta?.groundingChunks?.length ?? 0} toolTokens=${res.usageMetadata?.toolUsePromptTokenCount ?? 0}`);
-        const sources: WebSource[] = [];
-        for (const c of meta?.groundingChunks ?? []) {
-          const uri = c.web?.uri;
-          if (!uri || sources.some((x) => x.url === uri)) continue;
-          sources.push({ url: uri, title: c.web?.title || "web page" });
-        }
-        return { json: parseLoose(text), sources, searchQueries: (meta?.webSearchQueries ?? []).slice(0, 4) };
-      } catch (err) {
-        if (err instanceof AiError) throw err;
-        if (controller.signal.aborted) throw new AiError("timeout", "AI request timed out");
-        throw upstream(err);
-      } finally {
-        clearTimeout(timer);
-      }
-    },
     async generateJson(req) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), req.timeoutMs ?? 20_000);
@@ -212,25 +152,3 @@ export function asData(label: string, text: string): AiPart {
   return { text: `<${label}>\n${safe}\n</${label}>` };
 }
 
-/**
- * Startup probe for Google Search grounding: one plain question with no system
- * prompt, logged as shape only. Tells us whether search works on this key at all.
- */
-export async function groundingSelfCheck(ai: AiClient, log: (line: string) => void = console.log): Promise<void> {
-  if (!ai.available || !ai.generateGrounded) return;
-  for (const tier of ["smart", "fast"] as const) {
-    try {
-      const r = await ai.generateGrounded({
-        tier,
-        timeoutMs: 40_000,
-        system: "",
-        parts: [{ text: 'Use Google Search: what is today\'s top news headline in India? Reply as JSON {"headline": "..."}' }],
-        schema: {},
-      });
-      log(`Grounding self-check (${tier}): searches=${r.searchQueries.length} sources=${r.sources.length}`);
-    } catch (err) {
-      const e = err as AiError;
-      log(`Grounding self-check (${tier}): FAILED — ${e.kind ?? "error"}${e.detail ? ` (${e.detail})` : ""}`);
-    }
-  }
-}

@@ -19,6 +19,8 @@ export interface VendorChecklistItem {
   key: string;
   category: string;
   questions: string[];
+  /** What to search for on Google / Google Maps (e.g. "caterers"). */
+  search: string;
   /** Budget line key, when this vendor is paid from a line in this plan. */
   line?: string;
 }
@@ -77,5 +79,31 @@ const TEMPLATES: Record<EventType, VendorTemplate[]> = {
 export function buildVendorChecklist(eventType: EventType, selectors: readonly string[] = []): VendorChecklistItem[] {
   return TEMPLATES[eventType]
     .filter((t) => !t.onlyFor || t.onlyFor.some((s) => selectors.includes(s)))
-    .map(({ key, category, questions, line }) => ({ key, category, questions: [...questions], ...(line ? { line } : {}) }));
+    .map(({ key, category, questions, line }) => ({ key, category, questions: [...questions], search: SEARCH_TERMS[key] ?? category.toLowerCase(), ...(line ? { line } : {}) }));
 }
+
+/** What we search for (Google Maps and "check prices online"), per vendor category key (see engine/vendors.ts). */
+export const SEARCH_TERMS: Record<string, string> = {
+  venue: "banquet hall",
+  catering: "caterers",
+  "photo-video": "wedding photographer",
+  decor: "event decorators",
+  beauty: "bridal makeup artist",
+  mehendi: "mehendi artist",
+  entertainment: "DJ for events",
+  outfits: "bridal boutique",
+  "invites-gifts": "wedding card printers",
+  logistics: "car rental for weddings",
+  pandit: "pandit for puja",
+  cake: "cake shop",
+  "games-host": "kids party organiser",
+  "sound-lighting": "sound and light on rent",
+  mandali: "jagran mandali",
+  ration: "wholesale grocery",
+  safety: "security services",
+  stalls: "tent house",
+  promotion: "flex printing",
+  cooking: "tent house",
+  utensils: "tent house",
+  cleanup: "housekeeping services",
+};

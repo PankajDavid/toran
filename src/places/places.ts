@@ -8,31 +8,8 @@ import { z } from "zod";
  * Nothing is cached or logged.
  */
 
-/** What we search for, per vendor category key (see engine/vendors.ts). */
-export const SEARCH_TERMS: Record<string, string> = {
-  venue: "banquet hall",
-  catering: "caterers",
-  "photo-video": "wedding photographer",
-  decor: "event decorators",
-  beauty: "bridal makeup artist",
-  mehendi: "mehendi artist",
-  entertainment: "DJ for events",
-  outfits: "bridal boutique",
-  "invites-gifts": "wedding card printers",
-  logistics: "car rental for weddings",
-  pandit: "pandit for puja",
-  cake: "cake shop",
-  "games-host": "kids party organiser",
-  "sound-lighting": "sound and light on rent",
-  mandali: "jagran mandali",
-  ration: "wholesale grocery",
-  safety: "security services",
-  stalls: "tent house",
-  promotion: "flex printing",
-  cooking: "tent house",
-  utensils: "tent house",
-  cleanup: "housekeeping services",
-};
+export { SEARCH_TERMS } from "../engine/vendors.js";
+import { SEARCH_TERMS } from "../engine/vendors.js";
 
 export const FindVendorsSchema = z.strictObject({
   category: z.string().refine((k) => k in SEARCH_TERMS, "Unknown vendor category"),

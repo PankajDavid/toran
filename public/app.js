@@ -789,7 +789,7 @@
 
   /* Find vendors near you: real Google Maps listings, kept in memory only (not saved). */
   const found = new Map(); // category key -> { where, vendors } | { error }
-  const prices = new Map(); // category key -> { city, result } | { error }
+  const priceOpen = new Set(); // categories showing "check prices online" links
   let lastFind = 0;
   let searchCity = ""; // the city last searched, so the box keeps showing it after results appear
 
@@ -826,22 +826,11 @@
         el("label", { class: "sr-only", for: cityId }, "City to search in"),
         cityInput,
         el("button", { type: "submit", class: "btn-quiet" }, "Search"),
-        c.line ? el("button", { type: "button", class: "btn-quiet", onclick: async (e) => {
-          const city = cityInput.value.trim();
-          if (!/^[\p{L} .'-]{2,60}$/u.test(city)) { status.textContent = "Enter a city name to look up prices."; cityInput.focus(); return; }
-          searchCity = city;
-          const btn = e.currentTarget;
-          btn.disabled = true;
-          status.textContent = `Looking up typical prices in ${city}… this can take 20 seconds.`;
-          try {
-            const r = await api("/api/prices", { category: c.key, city, guestCount: k.guestCount }, { ai: true });
-            prices.set(c.key, { city, result: r });
-          } catch (err) {
-            prices.set(c.key, { error: (err.data && err.data.error) || "Couldn't look up prices just now." });
-          }
+        el("button", { type: "button", class: "btn-quiet", "aria-expanded": priceOpen.has(c.key) ? "true" : "false", onclick: () => {
+          if (priceOpen.has(c.key)) priceOpen.delete(c.key); else priceOpen.add(c.key);
           openVendorCats.add(c.key);
           renderVendors();
-        } }, "Typical prices") : null,
+        } }, "Check prices online"),
         "geolocation" in navigator ? el("button", { type: "button", class: "btn-quiet", onclick: () => {
           status.textContent = "Getting your location…";
           navigator.geolocation.getCurrentPosition(
@@ -851,8 +840,7 @@
             { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
         } }, "Near me") : null),
       status);
-    const pr = prices.get(c.key);
-    if (pr) box.append(priceBlock(pr, c));
+    if (priceOpen.has(c.key)) box.append(priceLinks(c, cityInput.value.trim() || k.city || ""));
     if (res && res.error) status.textContent = res.error;
     else if (res) {
       const mine = new Set((state.vendorList || []).filter((v) => v.cat === c.key).map((v) => v.name.trim().toLowerCase()));
@@ -881,26 +869,21 @@
     return box;
   }
 
-  function priceBlock(pr, c) {
-    if (pr.error) return el("p", { class: "v-find-status" }, pr.error);
-    const r = pr.result;
-    const google = r.searchQueries && r.searchQueries.length
-      ? el("p", { class: "v-gsearch" }, "Search on Google: ", r.searchQueries.map((q) =>
-        el("a", { class: "chip-link", href: "https://www.google.com/search?q=" + encodeURIComponent(q), target: "_blank", rel: "noopener" }, q))) : null;
-    if (!r.found) return el("div", { class: "v-price" }, el("p", { class: "v-find-status" }, `No clear prices on the web for ${pr.city}. Ask 2 or 3 vendors for written quotes.`), google);
-    const line = c.line && state.plan.spending.lines.find((l) => l.key === c.line);
-    const guests = state.plan.input.guestCount.toLocaleString("en-IN");
+  /**
+   * Google searches built by code, so families can see real published prices themselves.
+   * Toran never shows a price it can't source, so it doesn't summarise these pages.
+   */
+  function priceLinks(c, city) {
+    const where = city || "India";
+    const qs = [
+      `${c.search} price ${where}`,
+      `${c.search} rates ${where} wedmegood`,
+      `${c.search} ${where} justdial`,
+    ];
     return el("div", { class: "v-price" },
-      el("p", { class: "v-price-range" }, `${inr(r.lowINR)} – ${inr(r.highINR)} ${r.unit}`),
-      el("p", { class: "v-price-label" }, `Typical in ${pr.city}, fetched from the web. For budgeting only: confirm the price with the vendor.`),
-      r.totalLowINR !== undefined ? el("p", null,
-        r.unit === "per event" ? `Whole event: ${inr(r.totalLowINR)} – ${inr(r.totalHighINR)}` : `For ${guests} guests: ${inr(r.totalLowINR)} – ${inr(r.totalHighINR)}`,
-        line ? ` · your plan: ${inr(line.plannedINR)}` : "",
-        line && line.plannedINR < r.totalLowINR ? el("strong", { class: "v-price-warn" }, " (below the typical range)")
-          : line && line.plannedINR > r.totalHighINR ? el("strong", null, " (above the typical range: room for a better menu or to move money elsewhere)") : null) : null,
-      el("p", { class: "v-label" }, "Sources"),
-      el("ul", { class: "v-sources" }, r.sources.map((s) => el("li", null, el("a", { href: s.url, target: "_blank", rel: "noopener nofollow" }, s.title)))),
-      google);
+      el("p", { class: "v-price-label" }, `Published prices vary a lot and are often out of date. Use them for budgeting only, and confirm with the vendor.`),
+      el("p", { class: "v-gsearch" }, qs.map((q) =>
+        el("a", { class: "chip-link", href: "https://www.google.com/search?q=" + encodeURIComponent(q), target: "_blank", rel: "noopener" }, q))));
   }
 
   function checkVendorQuote(v, c) {
