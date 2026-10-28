@@ -1,5 +1,5 @@
 import { createApp } from "./app.js";
-import { aiClientFromEnv, aiSelfCheck } from "./ai/client.js";
+import { aiClientFromEnv, aiSelfCheck, groundingSelfCheck } from "./ai/client.js";
 import { placesClientFromEnv } from "./places/places.js";
 
 const port = Number(process.env.PORT) || 8080;
@@ -12,5 +12,5 @@ createApp({ ai, places }).listen(port, () => {
   console.log(
     `AI models: smart=${process.env.GEMINI_MODEL || "gemini-3.8-flash"}, fast=${process.env.GEMINI_FAST_MODEL || "gemini-3.5-flash-lite"}`,
   );
-  void aiSelfCheck(ai);
+  void aiSelfCheck(ai).then(() => groundingSelfCheck(ai));
 });

@@ -104,7 +104,7 @@ export function createGeminiClient(opts: GeminiOptions): AiClient {
           model: models[req.tier ?? "smart"],
           contents: [{ role: "user", parts: req.parts }],
           config: {
-            systemInstruction: req.system,
+            ...(req.system ? { systemInstruction: req.system } : {}),
             tools: [{ googleSearch: {} }],
             // No thinking override by default: low thinking made the model skip searching.
             ...(req.thinking ? { thinkingConfig: { thinkingLevel: req.thinking === "minimal" ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW } } : {}),
@@ -116,7 +116,7 @@ export function createGeminiClient(opts: GeminiOptions): AiClient {
         const cand = res.candidates?.[0];
         const meta = cand?.groundingMetadata ?? res.candidates?.find((c) => c.groundingMetadata)?.groundingMetadata;
         // Shape only (key names and counts), never content: to see where search results land.
-        console.log(`Grounding shape (${models[req.tier ?? "smart"]}): candidates=${res.candidates?.length ?? 0} finish=${cand?.finishReason ?? "-"} meta=${meta ? Object.keys(meta).join("+") || "empty" : "none"} chunks=${meta?.groundingChunks?.length ?? 0}`);
+        console.log(`Grounding shape (${models[req.tier ?? "smart"]}): candidates=${res.candidates?.length ?? 0} finish=${cand?.finishReason ?? "-"} meta=${meta ? Object.keys(meta).join("+") || "empty" : "none"} chunks=${meta?.groundingChunks?.length ?? 0} toolTokens=${res.usageMetadata?.toolUsePromptTokenCount ?? 0}`);
         const sources: WebSource[] = [];
         for (const c of meta?.groundingChunks ?? []) {
           const uri = c.web?.uri;
@@ -210,4 +210,27 @@ export function aiClientFromEnv(env: NodeJS.ProcessEnv = process.env): AiClient 
 export function asData(label: string, text: string): AiPart {
   const safe = text.replace(/</g, "‹").replace(/>/g, "›");
   return { text: `<${label}>\n${safe}\n</${label}>` };
+}
+
+/**
+ * Startup probe for Google Search grounding: one plain question with no system
+ * prompt, logged as shape only. Tells us whether search works on this key at all.
+ */
+export async function groundingSelfCheck(ai: AiClient, log: (line: string) => void = console.log): Promise<void> {
+  if (!ai.available || !ai.generateGrounded) return;
+  for (const tier of ["smart", "fast"] as const) {
+    try {
+      const r = await ai.generateGrounded({
+        tier,
+        timeoutMs: 40_000,
+        system: "",
+        parts: [{ text: 'Use Google Search: what is today\'s top news headline in India? Reply as JSON {"headline": "..."}' }],
+        schema: {},
+      });
+      log(`Grounding self-check (${tier}): searches=${r.searchQueries.length} sources=${r.sources.length}`);
+    } catch (err) {
+      const e = err as AiError;
+      log(`Grounding self-check (${tier}): FAILED — ${e.kind ?? "error"}${e.detail ? ` (${e.detail})` : ""}`);
+    }
+  }
 }
