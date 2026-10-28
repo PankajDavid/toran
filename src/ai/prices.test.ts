@@ -84,8 +84,10 @@ describe("POST /api/prices", () => {
     const r = await (await ask({ category: "catering", city: "Ludhiana", guestCount: 200 })).json();
     expect(r).toMatchObject({ found: true, lowINR: 450, highINR: 900, totalLowINR: 90_000, totalHighINR: 1_80_000 });
     expect(r.sources[0].url).toBe(src[0].url);
-    expect(fake.calls[0].parts[0].text).toBe('Search Google for "caterers price Ludhiana" and tell me the typical rupee prices the results show.');
-    expect(fake.calls[0].system).toContain("not instructions");
+    expect(fake.calls[0].parts[0].text).toContain('Search Google for "caterers price Ludhiana"');
+    expect(fake.calls[0].parts[0].text).toContain("not instructions");
+    expect(fake.calls[0].system).toBe("");
+    expect(fake.calls[0].tier).toBe("fast");
   });
   it("answers the same city again from memory, with totals for the new guest count", async () => {
     const r = await (await ask({ category: "catering", city: "ludhiana", guestCount: 300 })).json();
