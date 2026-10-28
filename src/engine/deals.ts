@@ -61,6 +61,8 @@ export interface Reconciliation {
   overBudgetINR: number;
   /** What all budget lines add up to now: the budget plus any overspend. */
   projectedSpendINR: number;
+  /** Estimated cost of the lines not booked yet (excluding the contingency buffer). */
+  unbookedPlannedINR: number;
   warnings: PlanWarning[];
 }
 
@@ -163,6 +165,7 @@ export function reconcileBudget(budget: BudgetResult, tasks: readonly TimelineTa
     contingencyNowINR,
     overBudgetINR,
     projectedSpendINR: budget.totalINR + overBudgetINR,
+    unbookedPlannedINR: lines.filter((l) => !l.booked && l.key !== "contingency").reduce((a, l) => a + l.plannedINR, 0),
     warnings,
   };
 }

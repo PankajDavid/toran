@@ -219,6 +219,21 @@ export function parseLocal(text: string, today: string, context: { asking?: Know
       }
     }
   }
+  // A plain amount with no unit ("…20 log, 25000, Panchkula"): a standalone number of
+  // 4+ digits that isn't the guest count or a year. Marked as a guess for confirmation.
+  if (budget === undefined && !bare) {
+    const used = new Set([String(fields.guestCount ?? "")]);
+    for (const m of t.matchAll(/(?:^|[\s,;])(\d{1,3}(?:,\d{2,3})+|\d{4,9})(?=$|[\s,;.])/g)) {
+      const raw = m[1].replace(/,/g, "");
+      const n = Number(raw);
+      if (used.has(raw) || (n >= 2020 && n <= 2035 && !m[1].includes(","))) continue;
+      if (n >= 1000) {
+        budget = n;
+        guessed.push("totalBudgetINR");
+        break;
+      }
+    }
+  }
   if (budget !== undefined) fields.totalBudgetINR = budget;
 
   const city = CITY_NAMES.find((c) => new RegExp(`\\b${c}\\b`).test(t));

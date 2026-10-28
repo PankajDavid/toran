@@ -99,6 +99,7 @@ describe("reconcileBudget — deal closed", () => {
     ]).spending;
     const unbooked = s.lines.filter((l) => !l.booked && l.key !== "contingency").reduce((a, l) => a + l.plannedINR, 0);
     expect(s.agreedINR + unbooked + s.contingencyNowINR - s.overBudgetINR).toBe(15_00_000);
+    expect(s.unbookedPlannedINR).toBe(unbooked);
     // and the table's total equals the sum of the amounts it shows
     expect(s.agreedINR + unbooked + s.contingencyNowINR).toBe(s.projectedSpendINR);
   });

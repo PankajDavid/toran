@@ -103,6 +103,18 @@ describe("parseLocal — how families actually talk", () => {
     expect(p("jain food only").diet).toBe("jain");
   });
 
+  it("reads a plain amount without a unit as the budget, flagged as a guess", () => {
+    const r = parseLocal("kitty party 15 nov, 20 log, 25000, Panchkula, pure veg", TODAY);
+    expect(r.fields).toMatchObject({ guestCount: 20, totalBudgetINR: 25_000, eventDate: "2026-11-15" });
+    expect(r.guessed).toContain("totalBudgetINR");
+    expect(parseLocal("shaadi 2,50,000 mein, 300 log", TODAY).fields.totalBudgetINR).toBe(2_50_000);
+  });
+
+  it("never reads a year or the guest count as a plain budget", () => {
+    expect(parseLocal("wedding on 14 feb 2027 with 300 log", TODAY).fields.totalBudgetINR).toBeUndefined();
+    expect(parseLocal("1500 guests", TODAY).fields.totalBudgetINR).toBeUndefined();
+  });
+
   it("interprets a bare number by the question being asked", () => {
     expect(p("300", "guestCount").guestCount).toBe(300);
     expect(p("250000", "totalBudgetINR").totalBudgetINR).toBe(250_000);

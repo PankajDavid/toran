@@ -477,13 +477,18 @@
     summary.replaceChildren();
     summary.hidden = !sp.bookedCount;
     if (sp.bookedCount) {
+      const diff = sp.agreedINR - sp.bookedPlannedINR; // + over estimate, - under
+      const tile = (label, value, sub, cls) =>
+        el("div", { class: cls || "" }, el("span", { class: "k" }, label), el("strong", null, value), sub ? el("span", { class: "s" }, sub) : null);
       summary.append(
-        el("div", null, el("span", { class: "k" }, "Booked"), el("strong", null, inr(sp.agreedINR))),
-        el("div", null, el("span", { class: "k" }, "Advance paid"), el("strong", null, inr(sp.advanceINR))),
-        el("div", null, el("span", { class: "k" }, "Balance due"), el("strong", null, inr(sp.dueINR))),
-        el("div", { class: sp.overBudgetINR ? "over" : "" },
-          el("span", { class: "k" }, sp.overBudgetINR ? "Over budget" : "Buffer left"),
-          el("strong", null, inr(sp.overBudgetINR || sp.contingencyNowINR))),
+        tile("Total budget", inr(p.budget.totalINR)),
+        tile("Booked", inr(sp.agreedINR), `estimated ${inr(sp.bookedPlannedINR)}${diff ? ` · ${diff > 0 ? inr(diff) + " over" : inr(-diff) + " saved"}` : ""}`, diff > 0 ? "warn" : diff < 0 ? "good" : ""),
+        tile("Paid so far", inr(sp.advanceINR)),
+        tile("Balance due", inr(sp.dueINR), "on bookings made"),
+        tile("Still to book", inr(sp.unbookedPlannedINR), "estimated"),
+        sp.overBudgetINR
+          ? tile("Over budget", inr(sp.overBudgetINR), "after using the buffer", "over")
+          : tile("Buffer left", inr(sp.contingencyNowINR), `planned ${inr(sp.contingencyPlannedINR)}`),
       );
     }
     const bpByKey = Object.fromEntries(p.budget.lines.map((l) => [l.key, l.bp]));
