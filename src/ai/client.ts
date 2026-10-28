@@ -113,7 +113,10 @@ export function createGeminiClient(opts: GeminiOptions): AiClient {
         });
         const text = res.text;
         if (!text) throw new AiError("bad-output", "Empty AI response");
-        const meta = res.candidates?.[0]?.groundingMetadata;
+        const cand = res.candidates?.[0];
+        const meta = cand?.groundingMetadata ?? res.candidates?.find((c) => c.groundingMetadata)?.groundingMetadata;
+        // Shape only (key names and counts), never content: to see where search results land.
+        console.log(`Grounding shape (${models[req.tier ?? "smart"]}): candidates=${res.candidates?.length ?? 0} finish=${cand?.finishReason ?? "-"} meta=${meta ? Object.keys(meta).join("+") || "empty" : "none"} chunks=${meta?.groundingChunks?.length ?? 0}`);
         const sources: WebSource[] = [];
         for (const c of meta?.groundingChunks ?? []) {
           const uri = c.web?.uri;

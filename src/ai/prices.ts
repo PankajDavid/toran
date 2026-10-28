@@ -112,7 +112,8 @@ export async function findPrices(req: PriceRequest, ai: AiClient, log: (line: st
   let out: PriceResult = { found: false, searchQueries: [] };
   for (const attempt of [1, 2] as const) {
     const res = await ai.generateGrounded({
-      tier: "smart",
+      // Second try uses the other model, in case one doesn't run Google Search on this key.
+      tier: attempt === 1 ? "smart" : "fast",
       timeoutMs: 40_000,
       system: SYSTEM,
       parts: [{ text: priceQuestion(req, attempt) }],
