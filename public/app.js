@@ -791,13 +791,14 @@
   const found = new Map(); // category key -> { where, vendors } | { error }
   const prices = new Map(); // category key -> { city, result } | { error }
   let lastFind = 0;
+  let searchCity = ""; // the city last searched, so the box keeps showing it after results appear
 
   function findBox(c) {
     const k = state.plan.input;
     const box = el("div", { class: "v-find" });
     const res = found.get(c.key);
     const cityId = `vc-${c.key}`;
-    const cityInput = el("input", { id: cityId, type: "text", maxlength: "60", autocomplete: "address-level2", placeholder: "e.g. Panchkula", value: k.city || null });
+    const cityInput = el("input", { id: cityId, type: "text", maxlength: "60", autocomplete: "address-level2", placeholder: "e.g. Panchkula", value: searchCity || k.city || null });
     const status = el("p", { class: "v-find-status", role: "status" });
     const run = async (body, where) => {
       const now = Date.now();
@@ -819,6 +820,7 @@
         e.preventDefault();
         const city = cityInput.value.trim();
         if (!/^[\p{L} .'-]{2,60}$/u.test(city)) { status.textContent = "Enter a city name, like Panchkula."; cityInput.focus(); return; }
+        searchCity = city;
         run({ city }, city);
       } },
         el("label", { class: "sr-only", for: cityId }, "City to search in"),
@@ -827,6 +829,7 @@
         c.line ? el("button", { type: "button", class: "btn-quiet", onclick: async (e) => {
           const city = cityInput.value.trim();
           if (!/^[\p{L} .'-]{2,60}$/u.test(city)) { status.textContent = "Enter a city name to look up prices."; cityInput.focus(); return; }
+          searchCity = city;
           const btn = e.currentTarget;
           btn.disabled = true;
           status.textContent = `Looking up typical prices in ${city}… this can take 20 seconds.`;
@@ -854,6 +857,7 @@
     else if (res) {
       const mine = new Set((state.vendorList || []).filter((v) => v.cat === c.key).map((v) => v.name.trim().toLowerCase()));
       box.append(
+        res.vendors.length ? el("p", { class: "v-label" }, res.where === "near you" ? "Google Maps results near your location" : `Google Maps results in ${res.where}`) : null,
         res.vendors.length ? el("p", { class: "fineprint-left v-vouch" }, "Listings and ratings from Google Maps. Toran doesn't vouch for any vendor: check reviews, visit, and get a written quote.") : null,
         res.vendors.length ? el("ul", { class: "v-found", "aria-label": `Google Maps results ${res.where}` }, res.vendors.map((f) => {
           const added = mine.has(f.name.trim().toLowerCase());
