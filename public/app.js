@@ -854,6 +854,7 @@
     else if (res) {
       const mine = new Set((state.vendorList || []).filter((v) => v.cat === c.key).map((v) => v.name.trim().toLowerCase()));
       box.append(
+        res.vendors.length ? el("p", { class: "fineprint-left v-vouch" }, "Listings and ratings from Google Maps. Toran doesn't vouch for any vendor: check reviews, visit, and get a written quote.") : null,
         res.vendors.length ? el("ul", { class: "v-found", "aria-label": `Google Maps results ${res.where}` }, res.vendors.map((f) => {
           const added = mine.has(f.name.trim().toLowerCase());
           return el("li", { class: "v-found-item" },
@@ -871,8 +872,7 @@
                 save();
                 renderVendors();
               } }, added ? "In your list" : "Add to my list")));
-        })) : el("p", { class: "v-find-status" }, `No listings found ${res.where === "near you" ? "near you" : "in " + res.where}. Try a nearby bigger city.`),
-        el("p", { class: "fineprint-left" }, "Listings and ratings from Google Maps. Toran doesn't vouch for any vendor: check reviews, visit, and get a written quote."));
+        })) : el("p", { class: "v-find-status" }, `No listings found ${res.where === "near you" ? "near you" : "in " + res.where}. Try a nearby bigger city.`));
     }
     return box;
   }

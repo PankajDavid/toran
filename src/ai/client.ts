@@ -97,27 +97,19 @@ export function createGeminiClient(opts: GeminiOptions): AiClient {
     async generateGrounded(req) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), req.timeoutMs ?? 30_000);
-      const call = (withSchema: boolean) =>
-        genai.models.generateContent({
+      // Plain-text mode: grounding is most reliable without a forced JSON format, so the
+      // system prompt asks for JSON and we pull it out of the text (then validate it).
+      try {
+        const res = await genai.models.generateContent({
           model: models[req.tier ?? "smart"],
           contents: [{ role: "user", parts: req.parts }],
           config: {
             systemInstruction: req.system,
             tools: [{ googleSearch: {} }],
-            // Gemini 3 can combine search with a JSON schema; if a model refuses, retry asking for JSON in text.
-            ...(withSchema ? { responseMimeType: "application/json", responseJsonSchema: req.schema } : {}),
             thinkingConfig: { thinkingLevel: req.thinking === "minimal" ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW },
             abortSignal: controller.signal,
           },
         });
-      try {
-        let res;
-        try {
-          res = await call(true);
-        } catch (err) {
-          if (controller.signal.aborted || !/INVALID_ARGUMENT/.test((err as Error)?.message ?? "")) throw err;
-          res = await call(false);
-        }
         const text = res.text;
         if (!text) throw new AiError("bad-output", "Empty AI response");
         const meta = res.candidates?.[0]?.groundingMetadata;

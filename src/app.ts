@@ -248,7 +248,7 @@ export function createApp(opts: AppOptions = {}) {
       else {
         result = await findPrices({ category, city }, ai);
         if (priceCache.size > 500) priceCache.clear();
-        priceCache.set(key, { at: Date.now(), result });
+        if (result.found) priceCache.set(key, { at: Date.now(), result }); // a miss may be a bad search: retry next time
       }
       // Guest totals are per request, worked out by code on the cached range.
       if (result.found && guestCount && (result.unit === "per plate" || result.unit === "per person")) {

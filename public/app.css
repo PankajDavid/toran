@@ -355,3 +355,4 @@ tr.booked th { color: var(--leaf); }
 .v-sources { margin: 2px 0 4px; padding-left: 20px; font-size: 14px; overflow-wrap: anywhere; }
 .v-gsearch { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .chip-link { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; background: #fff; color: var(--ink); text-decoration: none; }
+.v-vouch { margin-top: 8px; }
