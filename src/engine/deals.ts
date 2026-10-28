@@ -12,11 +12,23 @@ import type { TimelineTask } from "./timeline.js";
  * "over budget". Plain code, so every rupee is accounted for.
  */
 
-export const DealSchema = z.strictObject({
-  taskId: z.string().regex(/^[a-z]-[a-z-]{2,20}$/, "Unknown task"),
+const amounts = {
   agreedINR: z.number().int("Amounts must be whole rupees").min(0).max(LIMITS.maxBudgetINR),
   advanceINR: z.number().int("Amounts must be whole rupees").min(0).max(LIMITS.maxBudgetINR),
-}).refine((d) => d.advanceINR <= d.agreedINR, { message: "The advance can't be more than the agreed price", path: ["advanceINR"] });
+};
+
+/**
+ * A recorded cost comes from one of two places:
+ * - a timeline task the user ticked (`taskId`), which books its budget line, or
+ * - a budget line directly (`lineKey`), for costs no task covers
+ *   (e.g. a photographer for an anniversary).
+ */
+export const DealSchema = z
+  .union([
+    z.strictObject({ taskId: z.string().regex(/^[a-z]-[a-z-]{2,20}$/, "Unknown task"), ...amounts }),
+    z.strictObject({ lineKey: z.string().regex(/^[a-z][a-z-]{1,29}$/, "Unknown budget line"), ...amounts }),
+  ])
+  .refine((d) => d.advanceINR <= d.agreedINR, { message: "The advance can't be more than the agreed price", path: ["advanceINR"] });
 
 export const DealsSchema = z.array(DealSchema).max(40);
 export type Deal = z.infer<typeof DealSchema>;
@@ -58,13 +70,15 @@ export function reconcileBudget(budget: BudgetResult, tasks: readonly TimelineTa
   const taskById = new Map(tasks.map((t) => [t.id, t]));
   const lineKeys = new Set(budget.lines.map((l) => l.key));
 
-  // Sum deals per budget category. Deals for unknown tasks, or tasks that don't book anything, are ignored.
+  // Sum costs per budget line. Costs for unknown tasks/lines, tasks that don't book anything,
+  // or the contingency buffer itself are ignored.
   const perKey = new Map<string, { agreed: number; advance: number }>();
   const seen = new Set<string>();
   for (const d of deals) {
-    if (seen.has(d.taskId)) continue; // one deal per task; the first wins
-    seen.add(d.taskId);
-    const key = taskById.get(d.taskId)?.books;
+    const id = "taskId" in d ? `task:${d.taskId}` : `line:${d.lineKey}`;
+    if (seen.has(id)) continue; // one entry per task and per line; the first wins
+    seen.add(id);
+    const key = "taskId" in d ? taskById.get(d.taskId)?.books : d.lineKey;
     if (!key || !lineKeys.has(key) || key === "contingency") continue;
     const acc = perKey.get(key) ?? { agreed: 0, advance: 0 };
     acc.agreed += d.agreedINR;

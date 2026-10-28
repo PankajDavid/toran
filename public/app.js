@@ -65,7 +65,7 @@
 
   /* ---------- state ---------- */
   let state = load() || fresh();
-  function fresh() { return { known: {}, guessed: [], planInput: null, plan: null, done: {}, deals: {}, ideas: null, chat: [] }; }
+  function fresh() { return { known: {}, guessed: [], planInput: null, plan: null, done: {}, deals: {}, lineCosts: {}, ideas: null, chat: [] }; }
   function load() {
     try { const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); return s && typeof s === "object" ? { ...fresh(), ...s } : null; }
     catch { return null; }
@@ -289,7 +289,10 @@
   /* ---------- plan ---------- */
   /** Bookings recorded on this device, sent with the plan so code can re-balance the budget. */
   function dealList() {
-    return Object.entries(state.deals || {}).map(([taskId, d]) => ({ taskId, agreedINR: d.agreedINR, advanceINR: d.advanceINR }));
+    return [
+      ...Object.entries(state.deals || {}).map(([taskId, d]) => ({ taskId, agreedINR: d.agreedINR, advanceINR: d.advanceINR })),
+      ...Object.entries(state.lineCosts || {}).map(([lineKey, d]) => ({ lineKey, agreedINR: d.agreedINR, advanceINR: d.advanceINR })),
+    ];
   }
 
   /** Re-runs the calculator (no AI) after a booking changes. */
@@ -337,6 +340,47 @@
     ready.replaceWith(clone);
     clone.addEventListener("animationend", (e) => { if (e.animationName === "ready-out") clone.hidden = true; });
     setTimeout(() => { clone.hidden = true; }, 4500);
+  }
+
+  /** Inline form under a budget line, for costs no timeline task covers (or extra costs). */
+  function openLineCost(tr, line) {
+    const next = tr.nextElementSibling;
+    if (next && next.classList.contains("cost-row")) { next.remove(); return; }
+    const own = state.lineCosts[line.key];
+    const fromTasks = (line.agreedINR || 0) - (own ? own.agreedINR : 0);
+    const agreedId = `line-agreed-${line.key}`, advId = `line-adv-${line.key}`;
+    const msg = el("p", { class: "booking-msg", role: "alert" });
+    const agreed = el("input", { id: agreedId, type: "text", inputmode: "decimal", placeholder: "e.g. 2,000 or 1.5 lakh", required: true });
+    const advance = el("input", { id: advId, type: "text", inputmode: "decimal", placeholder: "0 if none yet" });
+    if (own) { agreed.value = String(own.agreedINR); advance.value = String(own.advanceINR); }
+    const form = el("form", { class: "booking" },
+      el("p", { class: "booking-title" }, `${line.label}: planned ${inr(line.plannedINR)}.`),
+      fromTasks > 0 ? el("p", { class: "booking-hint" }, `Already booked through the timeline: ${inr(fromTasks)}. Enter only other costs here, so nothing is counted twice.`) : null,
+      el("label", { for: agreedId }, "Amount agreed or spent"), agreed,
+      el("label", { for: advId }, "Paid so far"), advance,
+      msg,
+      el("div", { class: "booking-actions" },
+        el("button", { type: "submit", class: "btn-primary" }, "Save cost"),
+        own ? el("button", { type: "button", class: "btn-quiet", onclick: () => {
+          delete state.lineCosts[line.key];
+          save();
+          refreshPlan();
+        } }, "Remove") : null,
+        el("button", { type: "button", class: "btn-quiet", onclick: () => row.remove() }, "Cancel")));
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const a = parseRupees(agreed.value);
+      const adv = advance.value.trim() ? parseRupees(advance.value) : 0;
+      if (a === null) { msg.textContent = "Enter the amount in rupees, like 2,000 or 1.5 lakh."; agreed.focus(); return; }
+      if (adv === null) { msg.textContent = "Enter what's paid in rupees, or leave it empty."; advance.focus(); return; }
+      if (adv > a) { msg.textContent = "What's paid can't be more than the amount."; advance.focus(); return; }
+      state.lineCosts[line.key] = { agreedINR: a, advanceINR: adv };
+      save();
+      refreshPlan();
+    });
+    const row = el("tr", { class: "cost-row" }, el("td", { colspan: "3" }, form));
+    tr.after(row);
+    agreed.focus();
   }
 
   /** Inline "deal closed" form under a booking task. */
@@ -426,8 +470,14 @@
         note = el("span", { class: "line-note" }, `Planned ${inr(l.plannedINR)} · adjusted for your bookings`);
       }
       const amount = l.booked ? l.agreedINR : isBuffer ? sp.contingencyNowINR : l.plannedINR;
+      const own = state.lineCosts[l.key];
+      const costBtn = isBuffer ? null : el("button", {
+        type: "button", class: "link-btn",
+        "aria-label": `${own ? "Edit" : "Record"} cost for ${l.label}`,
+        onclick: (e) => openLineCost(e.currentTarget.closest("tr"), l),
+      }, own ? "Edit cost" : "Record cost");
       return el("tr", { class: l.booked ? "booked" : "" },
-        el("th", { scope: "row" }, l.label, l.booked ? el("span", { class: "badge booked" }, "booked") : null, note, bar),
+        el("th", { scope: "row" }, l.label, l.booked ? el("span", { class: "badge booked" }, "booked") : null, note, bar, costBtn),
         el("td", { class: "num" }, inr(amount)),
         el("td", { class: "num share" }, pct(bpByKey[l.key])));
     }));
@@ -566,6 +616,7 @@
       v: 1,
       i: state.planInput,
       d: state.deals || {},
+      l: state.lineCosts || {},
       t: Object.keys(state.done || {}).filter((k) => state.done[k]),
     };
     return `${location.origin}/#p=${b64urlEncode(JSON.stringify(payload))}`;
@@ -612,16 +663,24 @@
     if (state.plan && JSON.stringify(state.planInput) !== JSON.stringify(payload.i)) {
       if (!confirm("Open the shared plan? It will replace the plan saved on this phone.")) return false;
     }
-    const deals = {};
-    if (payload.d && typeof payload.d === "object") {
-      for (const [id, d] of Object.entries(payload.d)) {
-        if (d && Number.isInteger(d.agreedINR) && Number.isInteger(d.advanceINR)) deals[id] = { agreedINR: d.agreedINR, advanceINR: d.advanceINR };
+    const pick = (obj) => {
+      const out = {};
+      if (obj && typeof obj === "object") {
+        for (const [id, d] of Object.entries(obj)) {
+          if (d && Number.isInteger(d.agreedINR) && Number.isInteger(d.advanceINR)) out[id] = { agreedINR: d.agreedINR, advanceINR: d.advanceINR };
+        }
       }
-    }
+      return out;
+    };
+    const deals = pick(payload.d);
+    const lineCosts = pick(payload.l);
     try {
       // The server re-validates everything; a tampered link just fails.
-      const plan = await api("/api/plan", { ...payload.i, deals: Object.entries(deals).map(([taskId, d]) => ({ taskId, ...d })) });
-      state = { ...fresh(), known: { ...payload.i }, planInput: payload.i, plan, deals,
+      const plan = await api("/api/plan", { ...payload.i, deals: [
+        ...Object.entries(deals).map(([taskId, d]) => ({ taskId, ...d })),
+        ...Object.entries(lineCosts).map(([lineKey, d]) => ({ lineKey, ...d })),
+      ] });
+      state = { ...fresh(), known: { ...payload.i }, planInput: payload.i, plan, deals, lineCosts,
         done: Object.fromEntries((Array.isArray(payload.t) ? payload.t : []).filter((x) => typeof x === "string").map((x) => [x, true])) };
       save();
       renderKnown();
@@ -656,6 +715,13 @@
         : "Your plan is saved on this phone. To keep it one tap away, open your browser menu (⋮) and choose \"Add to Home screen\" or \"Install app\".";
     }
   }
+  window.addEventListener("appinstalled", () => {
+    $("install").hidden = false;
+    $("install-title").textContent = "Toran is installed";
+    $("install-text").textContent = "Look for the Toran icon on your home screen or in your app drawer (swipe up). On some phones, including Xiaomi, Oppo, Vivo and Realme, the icon only appears on the home screen after you allow it: Settings → Apps → Chrome → Permissions → \"Home screen shortcuts\".";
+    $("install-btn").hidden = true;
+    $("install-dismiss").textContent = "Got it";
+  });
   $("install-btn").addEventListener("click", async () => {
     if (!installEvent) return;
     installEvent.prompt();
@@ -697,6 +763,7 @@
   for (const m of state.chat) renderMsg(m.who, m.text);
   renderKnown();
   if (!state.deals) state.deals = {};
+  if (!state.lineCosts) state.lineCosts = {};
   if (state.plan && !state.plan.spending) { state.plan = null; } // plan saved by an older version
   function restore() {
     if (state.plan) { renderPlan(); show("plan"); }

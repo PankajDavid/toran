@@ -103,6 +103,32 @@ describe("reconcileBudget — deal closed", () => {
     expect(s.agreedINR + unbooked + s.contingencyNowINR).toBe(s.projectedSpendINR);
   });
 
+  it("records a cost directly on a budget line that no task books", () => {
+    const anniv = { eventType: "party", subType: "anniversary", totalBudgetINR: 1_00_000, guestCount: 50, cityTier: 2, eventDate: "2027-01-10", diet: "veg" };
+    const plan = buildPlan(anniv, TODAY);
+    expect(plan.timeline.tasks.some((t) => t.books === "photo-video")).toBe(false); // the gap Pankaj found
+    const s = buildPlan(anniv, TODAY, [{ lineKey: "photo-video", agreedINR: 2_000, advanceINR: 500 }]).spending;
+    const photo = s.lines.find((l) => l.key === "photo-video")!;
+    expect(photo).toMatchObject({ booked: true, agreedINR: 2_000, advanceINR: 500, dueINR: 1_500, differenceINR: 2_000 - 7_000 });
+    expect(s.savingsINR).toBe(5_000);
+  });
+
+  it("adds a line cost to costs booked through tasks on the same line", () => {
+    const s = buildPlan(wedding, TODAY, [
+      { taskId: "w-makeup", agreedINR: 40_000, advanceINR: 0 },
+      { lineKey: "beauty", agreedINR: 8_000, advanceINR: 8_000 },
+    ]).spending;
+    expect(s.lines.find((l) => l.key === "beauty")!.agreedINR).toBe(48_000);
+  });
+
+  it("ignores line costs for unknown lines and for the contingency buffer", () => {
+    const s = buildPlan(wedding, TODAY, [
+      { lineKey: "spaceship", agreedINR: 1, advanceINR: 0 },
+      { lineKey: "contingency", agreedINR: 1, advanceINR: 0 },
+    ]).spending;
+    expect(s.bookedCount).toBe(0);
+  });
+
   it("rejects bad booking input", () => {
     for (const bad of [
       [{ taskId: "w-venue", agreedINR: 1000, advanceINR: 2000 }], // advance > agreed
@@ -110,6 +136,8 @@ describe("reconcileBudget — deal closed", () => {
       [{ taskId: "w-venue", agreedINR: 10.5, advanceINR: 0 }],
       [{ taskId: "<script>", agreedINR: 1, advanceINR: 0 }],
       [{ taskId: "w-venue", agreedINR: 1, advanceINR: 0, extra: 1 }],
+      [{ taskId: "w-venue", lineKey: "venue", agreedINR: 1, advanceINR: 0 }], // both at once
+      [{ lineKey: "Venue!", agreedINR: 1, advanceINR: 0 }],
       "nope",
     ]) {
       expect(() => buildPlan(wedding, TODAY, bad)).toThrow(PlanInputError);
