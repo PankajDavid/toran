@@ -1,5 +1,7 @@
 # Toran · every celebration, sorted
 
+[![CI](https://github.com/PankajDavid/toran/actions/workflows/ci.yml/badge.svg)](https://github.com/PankajDavid/toran/actions/workflows/ci.yml)
+
 A GenAI planning assistant for Indian weddings, birthdays, kitty parties and community events: exact budgets, timelines, vendor checklists, a quote checker and personalised ideas.
 
 **Live:** https://toran.up.railway.app · Built for **PromptWars Virtual** (Google × Hack2Skill)
@@ -56,6 +58,8 @@ We also tried Gemini's Google Search grounding for live market prices. Productio
 npm install
 npm test          # 314 tests across 9 files
 npm run typecheck
+npm run lint      # Biome: lint + format check (TypeScript, browser JS, CSS)
+npm run check     # all three, as CI runs on every push
 ```
 
 Tests cover the budget (every line adds up to the exact total for every event type), timeline, bookings and re-balancing, the quote checks, suggestions (every rupee figure traced to the plan), the calendar file format, the interview parser, idea sanitising, Places result filtering and the HTTP API (validation, upload checks, offline fallbacks). AI is faked through an injected `AiClient`. After tests pass we deliberately break the code to confirm a test fails.
