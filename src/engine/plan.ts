@@ -2,6 +2,7 @@ import { allocateBudget, type BudgetResult, type PlanWarning } from "./budget.js
 import { DealsSchema, reconcileBudget, type Reconciliation } from "./deals.js";
 import { buildTimeline, type TimelineResult } from "./timeline.js";
 import { buildVendorChecklist, type VendorChecklistItem } from "./vendors.js";
+import { buildSuggestions, type Suggestion } from "./suggest.js";
 import { parsePlanInput, PlanInputError, type PlanInput } from "./validate.js";
 import { z } from "zod";
 
@@ -14,6 +15,8 @@ export interface Plan {
   vendors: VendorChecklistItem[];
   /** Budget re-balanced from the bookings the user has recorded. */
   spending: Reconciliation;
+  /** Next actions proposed by code; the user approves each one. */
+  suggestions: Suggestion[];
   warnings: PlanWarning[];
 }
 
@@ -43,6 +46,8 @@ export function buildPlan(raw: unknown, today: string, rawDeals: unknown = [], r
   // A vendor is only linked to a budget line this plan actually has.
   for (const v of vendors) if (v.line && !lineKeys.has(v.line)) delete v.line;
   const spending = reconcileBudget(budget, timeline.tasks, dealsResult.data);
+  const done = new Set(doneResult.data);
+  const suggestions = buildSuggestions(timeline, spending, vendors, done);
 
   return {
     input,
@@ -50,6 +55,7 @@ export function buildPlan(raw: unknown, today: string, rawDeals: unknown = [], r
     timeline,
     vendors,
     spending,
+    suggestions,
     // The "food per guest is low" advice only helps before food is booked.
     warnings: [
       ...budget.warnings.filter((w) => !(w.code === "FOOD_BELOW_FLOOR" && spending.lines.some((l) => l.key === "catering" && l.booked))),

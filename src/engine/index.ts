@@ -7,3 +7,5 @@ export * from "./validate.js";
 export * from "./plan.js";
 export * from "./deals.js";
 export * from "./quote.js";
+export * from "./suggest.js";
+export * from "./ics.js";

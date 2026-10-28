@@ -578,6 +578,7 @@
     renderQuoteStart();
     updateInstall();
     renderNav();
+    renderSuggestions();
     showSection(state.tab || SECTIONS[0]);
   }
 
@@ -1363,8 +1364,8 @@
     const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
     return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
   }
-  function planLink() {
-    const payload = {
+  function planPayload() {
+    return {
       v: 1,
       i: state.planInput,
       d: state.deals || {},
@@ -1374,7 +1375,9 @@
       vn: (state.vendorList || []).map((v) => [v.cat, v.name, v.phone || "", v.status, v.agreedINR ?? v.quoteINR ?? 0,
         v.booking ? v.booking.taskId || "=" + v.booking.lineKey : "", v.advanceINR || 0]),
     };
-    return `${location.origin}/#p=${b64urlEncode(JSON.stringify(payload))}`;
+  }
+  function planLink() {
+    return `${location.origin}/#p=${b64urlEncode(JSON.stringify(planPayload()))}`;
   }
 
   function planSummary() {
@@ -1419,8 +1422,13 @@
     try { payload = JSON.parse(b64urlDecode(m[1])); } catch { return false; }
     if (!payload || payload.v !== 1 || !payload.i || typeof payload.i !== "object") return false;
     if (state.plan && JSON.stringify(state.planInput) !== JSON.stringify(payload.i)) {
-      if (!confirm("Open the shared plan? It will replace the plan saved on this phone.")) return false;
+      if (!confirm("Open the shared plan? It will replace the plan saved on this device.")) return false;
     }
+    return openPayload(payload, "This plan link is damaged or out of date, so it couldn't be opened.");
+  }
+
+  /** Rebuilds a plan from a link or backup file. The server re-validates everything. */
+  async function openPayload(payload, failMessage, extra = {}) {
     const pick = (obj) => {
       const out = {};
       if (obj && typeof obj === "object") {
@@ -1455,15 +1463,135 @@
         return [v];
       });
       state = { ...fresh(), known: { ...payload.i }, planInput: payload.i, plan, deals, lineCosts, vendorList,
-        done: Object.fromEntries(doneIds.map((x) => [x, true])) };
+        done: Object.fromEntries(doneIds.map((x) => [x, true])), ...extra };
       save();
       renderKnown();
       renderPlan();
       show("plan");
       return true;
     } catch {
-      alert("This plan link is damaged or out of date, so it couldn't be opened.");
+      alert(failMessage);
       return false;
+    }
+  }
+
+  /* ---------- backup file & calendar file ---------- */
+  function downloadFile(name, blob) {
+    const url = URL.createObjectURL(blob);
+    const a = el("a", { href: url, download: name });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function backupPlan() {
+    const quotes = (state.quotes || []).slice(-30);
+    const data = { app: "toran", savedAt: new Date().toISOString(), ...planPayload(), q: quotes };
+    downloadFile(`toran-backup-${new Date().toISOString().slice(0, 10)}.json`, new Blob([JSON.stringify(data)], { type: "application/json" }));
+    state.backupSig = backupSignature();
+    save();
+  }
+  const backupSignature = () => JSON.stringify([state.deals, state.lineCosts, (state.vendorList || []).length, Object.keys(state.done || {}).length]);
+
+  /** Saved quotes from a backup: only well-formed entries; the quote itself is re-checked by the server when opened. */
+  function pickQuotes(list) {
+    return (Array.isArray(list) ? list : []).slice(-30).filter((q) => q && typeof q === "object"
+      && typeof q.id === "string" && typeof q.category === "string" && typeof q.vendorName === "string"
+      && Number.isInteger(q.trueTotalINR) && Number.isInteger(q.problems) && Number.isInteger(q.warnings) && q.quote && typeof q.quote === "object")
+      .map((q) => ({ id: q.id.slice(0, 20), category: q.category.slice(0, 30), vendorName: q.vendorName.slice(0, 80), quote: q.quote,
+        trueTotalINR: q.trueTotalINR, problems: q.problems, warnings: q.warnings, savedAt: String(q.savedAt || "").slice(0, 10), booked: q.booked === true }));
+  }
+  async function restoreFrom(file) {
+    if (!file) return;
+    if (file.size > 400_000) { alert("That file is too big to be a Toran backup."); return; }
+    let data;
+    try { data = JSON.parse(await file.text()); } catch { data = null; }
+    if (!data || data.app !== "toran" || data.v !== 1 || !data.i) { alert("That isn't a Toran backup file."); return; }
+    if (state.plan && !confirm("Restore this backup? It will replace the plan saved on this device.")) return;
+    const ok = await openPayload(data, "This backup is damaged or from an older version, so it couldn't be restored.", { quotes: pickQuotes(data.q), backupSig: "" });
+    if (ok) { state.backupSig = backupSignature(); save(); }
+  }
+  async function downloadCalendar(button) {
+    try {
+      const res = await fetch("/api/calendar", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...state.planInput, done: doneList() }) });
+      if (!res.ok) throw new Error("calendar");
+      downloadFile("toran-plan.ics", await res.blob());
+      state.calendarSig = calendarSignature();
+      save();
+      renderSuggestions();
+      return true;
+    } catch {
+      if (button) button.textContent = "Couldn't make the file. Try again";
+      return false;
+    }
+  }
+  const calendarSignature = () => JSON.stringify(state.planInput); // re-offer only if the event itself changes
+  $("restore-file").addEventListener("change", (e) => { restoreFrom(e.target.files && e.target.files[0]); e.target.value = ""; });
+  $("restore-file-plan").addEventListener("change", (e) => { restoreFrom(e.target.files && e.target.files[0]); e.target.value = ""; });
+  $("backup-btn").addEventListener("click", () => { backupPlan(); renderSuggestions(); });
+  $("calendar-btn").addEventListener("click", (e) => downloadCalendar(e.currentTarget));
+
+  /* ---------- Toran suggests: approve before anything happens ---------- */
+  function vendorSuggestions() {
+    if (!state.plan) return [];
+    const v = (state.vendorList || []).find((x) => x.status === "to-contact" && x.phone);
+    const cat = v && state.plan.vendors.find((c) => c.key === v.cat);
+    if (!v || !cat) return [];
+    return [{ id: `contact:${v.id}`, title: `Send your questions to ${v.name}`, why: `Opens WhatsApp with a polite message and the ${cat.questions.length} questions to ask. You check it and press send.`, button: "Open WhatsApp", action: { type: "whatsapp-vendor", vendorId: v.id } }];
+  }
+  function renderSuggestions() {
+    const box = $("suggest");
+    if (!state.plan) { box.hidden = true; return; }
+    const dismissed = state.dismissed || {};
+    const sig = (s) => s.title + "|" + s.why;
+    const all = [...(state.plan.suggestions || []).slice(0, 1), ...vendorSuggestions(), ...(state.plan.suggestions || []).slice(1)]
+      .filter((s) => dismissed[s.id] !== sig(s))
+      .filter((s) => !(s.id === "calendar" && state.calendarSig === calendarSignature()))
+      .filter((s) => !(s.id === "backup" && state.backupSig === backupSignature()))
+      .slice(0, 3);
+    box.hidden = all.length === 0;
+    $("suggest-list").replaceChildren(...all.map((s) => el("li", { class: "suggestion" },
+      el("div", { class: "sg-text" }, el("strong", null, s.title), el("span", null, s.why)),
+      el("div", { class: "sg-actions" },
+        el("button", { type: "button", class: "btn-primary", onclick: (e) => approve(s, e.currentTarget) }, s.button),
+        el("button", { type: "button", class: "btn-quiet", "aria-label": `Not now: ${s.title}`, onclick: () => {
+          state.dismissed = { ...(state.dismissed || {}), [s.id]: sig(s) };
+          save();
+          renderSuggestions();
+        } }, "Not now")))));
+  }
+  /** Runs an approved suggestion. Every action is one the user could also do by hand. */
+  async function approve(s, button) {
+    const a = s.action;
+    if (a.type === "open-vendors") {
+      openVendorCats.add(a.vendor);
+      showSection("vendors-card");
+      renderVendors();
+      const d = [...document.querySelectorAll("details.vendor")].find((x) => x.open && x.querySelector(".v-cat"));
+      const target = document.getElementById(`vc-${a.vendor}`);
+      if (target) { target.closest("details").scrollIntoView({ block: "start" }); target.focus({ preventScroll: true }); }
+      else if (d) d.scrollIntoView({ block: "start" });
+    } else if (a.type === "mark-done") {
+      state.done[a.taskId] = true;
+      save();
+      refreshPlan();
+    } else if (a.type === "open-section") {
+      showSection(a.section);
+      $(a.section).scrollIntoView({ block: "start" });
+    } else if (a.type === "download-calendar") {
+      await downloadCalendar(button);
+    } else if (a.type === "download-backup") {
+      backupPlan();
+      renderSuggestions();
+    } else if (a.type === "whatsapp-vendor") {
+      const v = (state.vendorList || []).find((x) => x.id === a.vendorId);
+      const cat = v && state.plan.vendors.find((c) => c.key === v.cat);
+      if (!v || !cat) return;
+      window.open(`https://wa.me/${waNumber(v.phone)}?text=${encodeURIComponent(vendorIntro(v, cat))}`, "_blank", "noopener");
+      v.status = "contacted";
+      save();
+      renderVendors();
+      renderSuggestions();
     }
   }
 

@@ -53,6 +53,8 @@
         <li><strong>Tips</strong><span>Practical tips for your kind of event.</span></li>
       </ul>
       <p class="fineprint">Every number is calculated by code, never guessed by AI. Nothing you type is stored on our server.</p>
+      <p class="fineprint"><label class="link-btn file-btn" for="restore-file">Restore a plan from a backup file</label>
+        <input id="restore-file" type="file" accept=".json,application/json" class="sr-only"></p>
     </section>
 
     <!-- Interview -->
@@ -91,6 +93,10 @@
           <button type="button" class="btn-primary" id="share-wa">Share on WhatsApp</button>
           <button type="button" class="btn-quiet" id="copy-link">Copy plan link</button>
           <button type="button" class="btn-quiet" id="save-pdf">Save as PDF</button>
+          <button type="button" class="btn-quiet" id="calendar-btn">Add to calendar</button>
+          <button type="button" class="btn-quiet" id="backup-btn">Backup</button>
+          <label class="btn-quiet file-btn" for="restore-file-plan">Restore</label>
+          <input id="restore-file-plan" type="file" accept=".json,application/json" class="sr-only">
         </div>
         <p class="share-note" id="share-note" role="status" hidden>Your plan lives on this device. The plan link carries a copy of it, so anyone you send it to can open it. Our server never stores it.</p>
       </div>
@@ -107,6 +113,12 @@
       </aside>
 
       <div class="warnings" id="warnings" role="status"></div>
+
+      <section class="suggest" id="suggest" aria-labelledby="suggest-title" hidden>
+        <h2 id="suggest-title">Toran suggests</h2>
+        <p class="card-sub">Nothing happens until you tap a button.</p>
+        <ul class="suggest-list" id="suggest-list"></ul>
+      </section>
 
       <div class="plan-body">
       <nav class="plan-nav" id="plan-nav" aria-label="Plan sections">

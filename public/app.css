@@ -394,3 +394,14 @@ tr.booked th { color: var(--leaf); }
   .plan .card[hidden] { display: block !important; }
   #get-invitation, #get-tips { display: none !important; }
 }
+
+/* Toran suggests */
+.suggest { margin: 0 0 16px; padding: 16px 18px; border-radius: var(--radius); background: var(--paper); border: 1.5px solid var(--marigold); }
+.suggest h2 { margin: 0; font-size: 20px; color: var(--kumkum); }
+.suggest .card-sub { margin: 2px 0 8px; }
+.suggest-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.suggestion { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--cream); }
+.sg-text { display: flex; flex-direction: column; gap: 2px; flex: 1 1 280px; min-width: 0; }
+.sg-text span { color: var(--muted); font-size: 14px; }
+.sg-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media print { .suggest { display: none !important; } }

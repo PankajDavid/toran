@@ -115,3 +115,20 @@ describe("HTTP API", () => {
     expect(statuses).toContain(429);
   });
 });
+
+describe("calendar endpoint", () => {
+  it("returns a calendar file for a valid plan and 400 for a bad one", async () => {
+    const { createApp } = await import("./app.js");
+    const { offlineClient } = await import("./ai/client.js");
+    const s = createApp({ today: () => "2026-10-28", ai: offlineClient }).listen(0);
+    await new Promise((r) => s.once("listening", r));
+    const base = `http://127.0.0.1:${(s.address() as import("node:net").AddressInfo).port}`;
+    const post = (body: unknown) => fetch(`${base}/api/calendar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const ok = await post({ eventType: "birthday", subType: "kid", totalBudgetINR: 50_000, guestCount: 30, cityTier: 2, eventDate: "2026-12-20", done: [] });
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get("content-type")).toContain("text/calendar");
+    expect(await ok.text()).toContain("BEGIN:VEVENT");
+    expect((await post({ eventType: "nope" })).status).toBe(400);
+    await new Promise<void>((r) => s.close(() => r()));
+  });
+});

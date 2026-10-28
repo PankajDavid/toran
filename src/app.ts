@@ -3,7 +3,7 @@ import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildPlan, parsePlanInput, PlanInputError, todayInIndia } from "./engine/index.js";
+import { buildCalendar, buildPlan, parsePlanInput, PlanInputError, todayInIndia } from "./engine/index.js";
 import { aiClientFromEnv, type AiClient } from "./ai/client.js";
 import { generateIdeas, IdeasRequestSchema } from "./ai/ideas.js";
 import { runInterviewTurn, TurnSchema } from "./interview/interview.js";
@@ -228,6 +228,29 @@ export function createApp(opts: AppOptions = {}) {
     standardHeaders: "draft-8",
     legacyHeaders: false,
     message: { error: "Too many requests. Please wait a minute and try again." },
+  });
+
+  const EVENT_TITLE: Record<string, string> = { wedding: "Wedding", birthday: "Birthday", party: "Get-together", community: "Community event" };
+
+  /** The plan's open deadlines and event day as a calendar file. Built by code; nothing is stored. */
+  app.post("/api/calendar", planLimiter, (req, res) => {
+    try {
+      const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? { ...req.body } : req.body;
+      const done = body && typeof body === "object" && "done" in body ? body.done : [];
+      if (body && typeof body === "object") { delete body.done; delete body.deals; }
+      const plan = buildPlan(body, today(), [], done);
+      const doneSet = new Set(Array.isArray(done) ? done.filter((x: unknown) => typeof x === "string") : []);
+      const ics = buildCalendar(plan.timeline, { title: `${EVENT_TITLE[plan.input.eventType]} (Toran)`, done: doneSet, stamp: new Date() });
+      res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+      res.setHeader("Content-Disposition", 'attachment; filename="toran-plan.ics"');
+      res.send(ics);
+    } catch (err) {
+      if (err instanceof PlanInputError) {
+        res.status(400).json({ error: "Please check your inputs.", issues: err.issues });
+        return;
+      }
+      throw err;
+    }
   });
 
   app.post("/api/plan", planLimiter, (req, res) => {
