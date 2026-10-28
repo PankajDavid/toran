@@ -577,7 +577,57 @@
     renderIdeas();
     renderQuoteStart();
     updateInstall();
+    renderNav();
   }
+
+  /* ---------- sections menu ---------- */
+  function setStat(id, text, alert) {
+    const n = $(id);
+    n.textContent = text;
+    n.classList.toggle("alert", !!alert);
+  }
+  function renderNav() {
+    const p = state.plan;
+    const sp = p.spending;
+    setStat("nav-budget", sp.bookedCount ? `${inr(sp.agreedINR)} booked` : inr(p.input.totalBudgetINR), sp.overBudgetINR > 0);
+    const open = p.timeline.tasks.filter((t) => !state.done[t.id]);
+    const late = open.filter((t) => t.status === "late").length;
+    setStat("nav-timeline", late ? `${late} late` : open.length ? `${open.length} to do` : "all done", late > 0);
+    const list = state.vendorList || [];
+    const confirmed = p.vendors.filter((c) => list.some((v) => v.cat === c.key && v.status === "confirmed")).length;
+    setStat("nav-vendors", `${confirmed}/${p.vendors.length} confirmed`);
+    const q = (state.quotes || []).length;
+    setStat("nav-quotes", q ? `${q} saved` : "check a quote");
+    setStat("nav-ideas", state.ideas ? "ready" : "get ideas");
+    updateActiveNav();
+  }
+
+  // Highlights the section on screen in the menu.
+  const navLinks = [...document.querySelectorAll("#plan-nav a")];
+  // The active section is the last one whose top has passed under the menu;
+  // cards side by side (same top) count as one row, and the first of them wins.
+  let navTick = false;
+  function updateActiveNav() {
+    navTick = false;
+    const line = innerWidth >= 1100 ? 120 : 170;
+    let active = navLinks[0] && navLinks[0].dataset.sec, activeTop = -Infinity;
+    for (const a of navLinks) {
+      const t = $(a.dataset.sec);
+      if (!t) continue;
+      const top = Math.round(t.getBoundingClientRect().top);
+      if (top <= line && top > activeTop + 8) { active = a.dataset.sec; activeTop = top; }
+    }
+    navLinks.forEach((a) => a.setAttribute("aria-current", a.dataset.sec === active ? "true" : "false"));
+  }
+  addEventListener("scroll", () => { if (!navTick) { navTick = true; requestAnimationFrame(updateActiveNav); } }, { passive: true });
+  navLinks.forEach((a) => a.addEventListener("click", (e) => {
+    const t = $(a.dataset.sec);
+    if (!t) return;
+    e.preventDefault();
+    t.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    const h = t.querySelector("h2");
+    if (h) { h.setAttribute("tabindex", "-1"); h.focus({ preventScroll: true }); }
+  }));
 
   /* ---------- ideas ---------- */
   function renderIdeas() {
@@ -628,6 +678,7 @@
       btn.disabled = false;
       btn.textContent = "Get ideas";
       renderIdeas();
+      renderNav();
     }
   }
   $("get-ideas").addEventListener("click", () => loadIdeas());
@@ -719,6 +770,7 @@
       det.addEventListener("toggle", () => { if (det.open) openVendorCats.add(c.key); else openVendorCats.delete(c.key); });
       return det;
     }));
+    renderNav();
   }
 
   function vendorRow(v, c, line) {
@@ -1240,6 +1292,7 @@
     const box = $("quote-saved");
     const list = state.quotes || [];
     box.replaceChildren();
+    if (state.plan) renderNav();
     if (!list.length) return;
     const byCat = {};
     for (const q of list) (byCat[q.category] = byCat[q.category] || []).push(q);

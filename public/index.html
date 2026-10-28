@@ -43,6 +43,13 @@
       <p class="tagline">every celebration, sorted.</p>
       <p class="lede">Weddings, birthdays, kitty parties, jagrans and society functions. Tell me about your event and I'll build an exact budget, a timeline and a vendor checklist.</p>
       <button type="button" class="btn-primary btn-big" id="start">Let's plan</button>
+      <ul class="features" aria-label="What Toran does">
+        <li><strong>Exact budget</strong><span>Split to the rupee, and it re-balances as you book.</span></li>
+        <li><strong>Timeline</strong><span>Every task dated back from your event day.</span></li>
+        <li><strong>Vendors</strong><span>Find real vendors on Google Maps, track and confirm them.</span></li>
+        <li><strong>Quote Checker</strong><span>Photograph a quote: catch maths, GST and hidden-cost traps.</span></li>
+        <li><strong>Ideas</strong><span>Themes, decor, menu and invitation wording.</span></li>
+      </ul>
       <p class="fineprint">Every number is calculated by code, never guessed by AI. Nothing you type is stored on our server.</p>
     </section>
 
@@ -99,8 +106,18 @@
 
       <div class="warnings" id="warnings" role="status"></div>
 
+      <div class="plan-body">
+      <nav class="plan-nav" id="plan-nav" aria-label="Plan sections">
+        <ul>
+          <li><a href="#budget-card" data-sec="budget-card"><span class="nav-name">Budget</span><span class="nav-stat" id="nav-budget"></span></a></li>
+          <li><a href="#timeline-card" data-sec="timeline-card"><span class="nav-name">Timeline</span><span class="nav-stat" id="nav-timeline"></span></a></li>
+          <li><a href="#vendors-card" data-sec="vendors-card"><span class="nav-name">Vendors</span><span class="nav-stat" id="nav-vendors"></span></a></li>
+          <li><a href="#quote-card" data-sec="quote-card"><span class="nav-name">Quote Checker</span><span class="nav-stat" id="nav-quotes"></span></a></li>
+          <li><a href="#ideas-card" data-sec="ideas-card"><span class="nav-name">Ideas</span><span class="nav-stat" id="nav-ideas"></span></a></li>
+        </ul>
+      </nav>
       <div class="grid">
-        <article class="card" aria-labelledby="budget-title">
+        <article class="card" id="budget-card" aria-labelledby="budget-title">
           <h2 id="budget-title">Budget</h2>
           <p class="card-sub" id="budget-sub"></p>
           <div class="spend-summary" id="spend-summary" hidden aria-live="polite"></div>
@@ -113,7 +130,7 @@
           <p class="card-note">Amounts are estimates to plan with, and every line adds up to your exact total. Tick a booking in the timeline to record the final price: savings go into the buffer, and overspending comes out of it first.</p>
         </article>
 
-        <article class="card" aria-labelledby="timeline-title">
+        <article class="card" id="timeline-card" aria-labelledby="timeline-title">
           <h2 id="timeline-title">Timeline</h2>
           <p class="card-sub" id="timeline-sub"></p>
           <ol class="tasks" id="tasks"></ol>
@@ -147,7 +164,7 @@
         </article>
 
 
-        <article class="card" aria-labelledby="ideas-title">
+        <article class="card" id="ideas-card" aria-labelledby="ideas-title">
           <h2 id="ideas-title">Ideas</h2>
           <p class="card-sub" id="ideas-sub">Themes, decor, menu and invitation wording for your event.</p>
           <button type="button" class="btn-primary" id="get-ideas">Get ideas</button>
@@ -160,6 +177,7 @@
             </div>
           </form>
         </article>
+      </div>
       </div>
     </section>
   </main>
