@@ -66,7 +66,9 @@ export function createApp(opts: AppOptions = {}) {
     next();
   });
 
-  app.use(rateLimit({ windowMs: 15 * 60_000, limit: 300, standardHeaders: "draft-8", legacyHeaders: false }));
+  // Overall cap per IP on the API. Static files (page, scripts, icons) are not counted:
+  // one page load fetches about 20 of them, and they cost nothing to serve.
+  app.use(["/api", "/health"], rateLimit({ windowMs: 15 * 60_000, limit: 300, standardHeaders: "draft-8", legacyHeaders: false }));
   // Small JSON bodies everywhere, except a confirmed quote (up to 60 lines) which gets 64kb.
   const smallJson = express.json({ limit: "10kb" });
   app.use((req, res, next) => (req.path === "/api/quote/check" ? next() : smallJson(req, res, next)));

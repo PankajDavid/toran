@@ -10,29 +10,60 @@
     "lineWidth": 140
   },
   "javascript": {
-    "formatter": { "quoteStyle": "double", "semicolons": "always", "trailingCommas": "all" }
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
   },
   "linter": {
     "enabled": true,
-    "rules": { "preset": "recommended" }
+    "rules": {
+      "preset": "recommended"
+    }
   },
-  "assist": { "enabled": true, "actions": { "source": { "organizeImports": "off" } } },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "off"
+      }
+    }
+  },
   "overrides": [
     {
       "includes": ["**/*.test.ts"],
-      "linter": { "rules": { "style": { "noNonNullAssertion": "off" } } }
-    },
-    {
-      "includes": ["public/**/*.js"],
-      "javascript": { "globals": [] },
-      "linter": { "rules": { "suspicious": { "noRedundantUseStrict": "off" } } }
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
     },
     {
       "includes": ["public/**/*.css"],
       "linter": {
         "rules": {
-          "complexity": { "noImportantStyles": "off" },
-          "style": { "noDescendingSpecificity": "off" }
+          "complexity": {
+            "noImportantStyles": "off"
+          },
+          "style": {
+            "noDescendingSpecificity": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["public/**/*.js"],
+      "javascript": {
+        "globals": []
+      },
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUndeclaredVariables": "error"
+          }
         }
       }
     }

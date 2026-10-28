@@ -71,7 +71,9 @@ Keyboard-operable throughout (sections menu is an ARIA tablist with arrow keys),
 ## Architecture
 
 ```
-public/            Plain HTML, CSS and vanilla JS (no framework), PWA files
+public/            Plain HTML and CSS, PWA files (no framework, no build step)
+public/js/         Browser ES modules, one per feature: interview, plan, nav, vendors,
+                   quote, ideas, share, files (backup, calendar), suggest, install, store, main
 src/engine/        Deterministic planner: budget, timeline, vendors, deals, quote checks, suggestions, calendar
 src/interview/     Local Hinglish parser + interview flow (AI only for gaps)
 src/ai/            Gemini client (injectable), ideas, quote reader

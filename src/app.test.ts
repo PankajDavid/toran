@@ -116,7 +116,7 @@ describe("HTTP API", () => {
   });
 
   it("app files are always revalidated so updates show on the next open", async () => {
-    for (const f of ["/", "/app.js", "/app.css", "/sw.js", "/manifest.webmanifest"]) {
+    for (const f of ["/", "/js/main.js", "/js/plan.js", "/app.css", "/sw.js", "/manifest.webmanifest"]) {
       expect((await fetch(`${base}${f}`)).headers.get("cache-control")).toBe("no-cache");
     }
     expect((await fetch(`${base}/favicon.svg`)).headers.get("cache-control")).toContain("max-age=86400");
@@ -156,6 +156,20 @@ describe("calendar endpoint", () => {
     expect(ok.headers.get("content-type")).toContain("text/calendar");
     expect(await ok.text()).toContain("BEGIN:VEVENT");
     expect((await post({ eventType: "nope" })).status).toBe(400);
+    await new Promise<void>((r) => s.close(() => r()));
+  });
+});
+
+describe("static files", () => {
+  it("are not rate limited: 40 page loads in a row all succeed", async () => {
+    const { createApp } = await import("./app.js");
+    const { offlineClient } = await import("./ai/client.js");
+    const s = createApp({ ai: offlineClient }).listen(0);
+    await new Promise((r) => s.once("listening", r));
+    const base = `http://127.0.0.1:${(s.address() as import("node:net").AddressInfo).port}`;
+    const files = ["/", "/js/main.js", "/js/plan.js", "/app.css", "/favicon.svg", "/js/quote.js", "/js/vendors.js", "/js/store.js"];
+    const statuses = await Promise.all(Array.from({ length: 40 }, (_, i) => fetch(base + files[i % files.length]).then((r) => r.status)));
+    expect(new Set(statuses)).toEqual(new Set([200]));
     await new Promise<void>((r) => s.close(() => r()));
   });
 });
