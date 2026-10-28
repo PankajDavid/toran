@@ -74,12 +74,17 @@ export function reconcileBudget(budget: BudgetResult, tasks: readonly TimelineTa
   // or the contingency buffer itself are ignored.
   const perKey = new Map<string, { agreed: number; advance: number }>();
   const seen = new Set<string>();
+  // Remember amounts per line by source, to spot the same cost entered twice.
+  const taskAmounts = new Map<string, number[]>();
+  const lineAmount = new Map<string, number>();
   for (const d of deals) {
     const id = "taskId" in d ? `task:${d.taskId}` : `line:${d.lineKey}`;
     if (seen.has(id)) continue; // one entry per task and per line; the first wins
     seen.add(id);
     const key = "taskId" in d ? taskById.get(d.taskId)?.books : d.lineKey;
     if (!key || !lineKeys.has(key) || key === "contingency") continue;
+    if ("taskId" in d) taskAmounts.set(key, [...(taskAmounts.get(key) ?? []), d.agreedINR]);
+    else lineAmount.set(key, d.agreedINR);
     const acc = perKey.get(key) ?? { agreed: 0, advance: 0 };
     acc.agreed += d.agreedINR;
     acc.advance += d.advanceINR;
@@ -114,6 +119,18 @@ export function reconcileBudget(budget: BudgetResult, tasks: readonly TimelineTa
   const overBudgetINR = Math.max(0, -contingencyRaw);
 
   const warnings: PlanWarning[] = [];
+  // A line cost exactly equal to a timeline booking on the same line is almost
+  // certainly the same payment entered twice. Flag it; never silently drop it.
+  for (const [key, amount] of lineAmount) {
+    if (amount > 0 && (taskAmounts.get(key) ?? []).includes(amount)) {
+      const label = budget.lines.find((l) => l.key === key)?.label ?? key;
+      warnings.push({
+        code: "POSSIBLE_DUPLICATE",
+        severity: "warning",
+        message: `${label}: ${inr(amount)} is recorded twice, once from the timeline and once as an extra cost. If it's the same payment, tap "Edit cost" on ${label} and clear the extra cost.`,
+      });
+    }
+  }
   if (overBudgetINR > 0) {
     warnings.push({
       code: "OVER_BUDGET",

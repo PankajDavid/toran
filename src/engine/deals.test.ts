@@ -121,6 +121,25 @@ describe("reconcileBudget — deal closed", () => {
     expect(s.lines.find((l) => l.key === "beauty")!.agreedINR).toBe(48_000);
   });
 
+  it("flags the same amount entered via the timeline and as a line cost (Pankaj's Diwali mela case)", () => {
+    const mela = { eventType: "community", subType: "diwali-mela", totalBudgetINR: 3_00_000, guestCount: 800, cityTier: 2, eventDate: "2027-01-10" };
+    const s = buildPlan(mela, TODAY, [
+      { taskId: "c-venue", agreedINR: 60_000, advanceINR: 20_000 },
+      { lineKey: "venue", agreedINR: 60_000, advanceINR: 20_000 },
+    ]).spending;
+    expect(s.lines.find((l) => l.key === "venue")!.agreedINR).toBe(1_20_000); // still summed, never silently dropped
+    expect(s.warnings.map((w) => w.code)).toContain("POSSIBLE_DUPLICATE");
+    expect(s.warnings.find((w) => w.code === "POSSIBLE_DUPLICATE")!.message).toContain("Ground & tent");
+  });
+
+  it("does not flag a genuinely different extra cost", () => {
+    const s = buildPlan(wedding, TODAY, [
+      { taskId: "w-makeup", agreedINR: 40_000, advanceINR: 0 },
+      { lineKey: "beauty", agreedINR: 8_000, advanceINR: 0 },
+    ]).spending;
+    expect(s.warnings.map((w) => w.code)).not.toContain("POSSIBLE_DUPLICATE");
+  });
+
   it("ignores line costs for unknown lines and for the contingency buffer", () => {
     const s = buildPlan(wedding, TODAY, [
       { lineKey: "spaceship", agreedINR: 1, advanceINR: 0 },

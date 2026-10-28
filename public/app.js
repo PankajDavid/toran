@@ -342,45 +342,77 @@
     setTimeout(() => { clone.hidden = true; }, 4500);
   }
 
-  /** Inline form under a budget line, for costs no timeline task covers (or extra costs). */
+  /**
+   * Inline form under a budget line. It shows EVERY cost already recorded on this
+   * line, each editable in place, so editing never adds a second copy:
+   *  - one row per timeline booking that books this line, and
+   *  - one "other costs" row for anything no task covers (optional).
+   */
   function openLineCost(tr, line) {
     const next = tr.nextElementSibling;
     if (next && next.classList.contains("cost-row")) { next.remove(); return; }
+    const tasks = state.plan.timeline.tasks.filter((t) => t.books === line.key && state.deals[t.id]);
     const own = state.lineCosts[line.key];
-    const fromTasks = (line.agreedINR || 0) - (own ? own.agreedINR : 0);
-    const agreedId = `line-agreed-${line.key}`, advId = `line-adv-${line.key}`;
     const msg = el("p", { class: "booking-msg", role: "alert" });
-    const agreed = el("input", { id: agreedId, type: "text", inputmode: "decimal", placeholder: "e.g. 2,000 or 1.5 lakh", required: true });
-    const advance = el("input", { id: advId, type: "text", inputmode: "decimal", placeholder: "0 if none yet" });
-    if (own) { agreed.value = String(own.agreedINR); advance.value = String(own.advanceINR); }
+    const entries = []; // { kind, id, label, agreed, advance }
+
+    function entry(kind, id, label, hint, current) {
+      const aId = `cost-a-${kind}-${id}`, pId = `cost-p-${kind}-${id}`;
+      const agreed = el("input", { id: aId, type: "text", inputmode: "decimal", placeholder: kind === "line" ? "Leave empty if none" : "e.g. 60,000" });
+      const advance = el("input", { id: pId, type: "text", inputmode: "decimal", placeholder: "0 if none yet" });
+      if (current) { agreed.value = String(current.agreedINR); advance.value = String(current.advanceINR); }
+      entries.push({ kind, id, label, agreed, advance });
+      return el("fieldset", { class: "cost-entry" },
+        el("legend", null, label),
+        hint ? el("p", { class: "booking-hint" }, hint) : null,
+        el("div", { class: "cost-pair" },
+          el("div", null, el("label", { for: aId }, "Agreed or spent"), agreed),
+          el("div", null, el("label", { for: pId }, "Paid so far"), advance)));
+    }
+
+    const fields = [
+      ...tasks.map((t) => entry("task", t.id, `From the timeline: ${t.title}`, null, state.deals[t.id])),
+      entry("line", line.key, tasks.length ? "Other costs for this line" : line.label,
+        tasks.length ? "Only costs the timeline booking above doesn't already include." : null, own),
+    ];
+
     const form = el("form", { class: "booking" },
-      el("p", { class: "booking-title" }, `${line.label}: planned ${inr(line.plannedINR)}.`),
-      fromTasks > 0 ? el("p", { class: "booking-hint" }, `Already booked through the timeline: ${inr(fromTasks)}. Enter only other costs here, so nothing is counted twice.`) : null,
-      el("label", { for: agreedId }, "Amount agreed or spent"), agreed,
-      el("label", { for: advId }, "Paid so far"), advance,
+      el("p", { class: "booking-title" }, `${line.label}: planned ${inr(line.plannedINR)}`),
+      ...fields,
       msg,
       el("div", { class: "booking-actions" },
-        el("button", { type: "submit", class: "btn-primary" }, "Save cost"),
-        own ? el("button", { type: "button", class: "btn-quiet", onclick: () => {
-          delete state.lineCosts[line.key];
-          save();
-          refreshPlan();
-        } }, "Remove") : null,
+        el("button", { type: "submit", class: "btn-primary" }, "Save"),
         el("button", { type: "button", class: "btn-quiet", onclick: () => row.remove() }, "Cancel")));
+
     form.addEventListener("submit", (e) => {
       e.preventDefault();
-      const a = parseRupees(agreed.value);
-      const adv = advance.value.trim() ? parseRupees(advance.value) : 0;
-      if (a === null) { msg.textContent = "Enter the amount in rupees, like 2,000 or 1.5 lakh."; agreed.focus(); return; }
-      if (adv === null) { msg.textContent = "Enter what's paid in rupees, or leave it empty."; advance.focus(); return; }
-      if (adv > a) { msg.textContent = "What's paid can't be more than the amount."; advance.focus(); return; }
-      state.lineCosts[line.key] = { agreedINR: a, advanceINR: adv };
+      const updates = [];
+      for (const f of entries) {
+        const aText = f.agreed.value.trim();
+        const pText = f.advance.value.trim();
+        if (!aText) {
+          if (f.kind === "task") { msg.textContent = `Enter the agreed price for "${f.label.replace("From the timeline: ", "")}", or untick that task in the timeline to remove it.`; f.agreed.focus(); return; }
+          updates.push({ f, value: null }); // empty "other costs" = remove it
+          continue;
+        }
+        const a = parseRupees(aText);
+        const adv = pText ? parseRupees(pText) : 0;
+        if (a === null) { msg.textContent = "Enter amounts in rupees, like 60,000 or 1.5 lakh."; f.agreed.focus(); return; }
+        if (adv === null) { msg.textContent = "Enter what's paid in rupees, or leave it empty."; f.advance.focus(); return; }
+        if (adv > a) { msg.textContent = "What's paid can't be more than the amount."; f.advance.focus(); return; }
+        updates.push({ f, value: { agreedINR: a, advanceINR: adv } });
+      }
+      for (const { f, value } of updates) {
+        if (f.kind === "task") state.deals[f.id] = value;
+        else if (value && value.agreedINR > 0) state.lineCosts[f.id] = value;
+        else delete state.lineCosts[f.id];
+      }
       save();
       refreshPlan();
     });
     const row = el("tr", { class: "cost-row" }, el("td", { colspan: "3" }, form));
     tr.after(row);
-    agreed.focus();
+    (entries[0].agreed).focus();
   }
 
   /** Inline "deal closed" form under a booking task. */
@@ -470,12 +502,12 @@
         note = el("span", { class: "line-note" }, `Planned ${inr(l.plannedINR)} · adjusted for your bookings`);
       }
       const amount = l.booked ? l.agreedINR : isBuffer ? sp.contingencyNowINR : l.plannedINR;
-      const own = state.lineCosts[l.key];
+      const hasCost = l.booked; // from a timeline booking and/or a recorded cost
       const costBtn = isBuffer ? null : el("button", {
         type: "button", class: "link-btn",
-        "aria-label": `${own ? "Edit" : "Record"} cost for ${l.label}`,
+        "aria-label": `${hasCost ? "Edit" : "Record"} cost for ${l.label}`,
         onclick: (e) => openLineCost(e.currentTarget.closest("tr"), l),
-      }, own ? "Edit cost" : "Record cost");
+      }, hasCost ? "Edit cost" : "Record cost");
       return el("tr", { class: l.booked ? "booked" : "" },
         el("th", { scope: "row" }, l.label, l.booked ? el("span", { class: "badge booked" }, "booked") : null, note, bar, costBtn),
         el("td", { class: "num" }, inr(amount)),
@@ -766,7 +798,13 @@
   if (!state.lineCosts) state.lineCosts = {};
   if (state.plan && !state.plan.spending) { state.plan = null; } // plan saved by an older version
   function restore() {
-    if (state.plan) { renderPlan(); show("plan"); }
+    if (state.plan) {
+      renderPlan();
+      show("plan");
+      // Recalculate on every open (no AI): keeps "days to go" and late tasks current,
+      // and applies engine fixes and warnings to plans saved by older versions.
+      refreshPlan();
+    }
     else if (state.chat.length) { show("interview"); turn({}); }
   }
   if (/^#p=/.test(location.hash)) importFromLink().then((opened) => { if (!opened) restore(); });
