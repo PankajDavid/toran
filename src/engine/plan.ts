@@ -3,6 +3,9 @@ import { DealsSchema, reconcileBudget, type Reconciliation } from "./deals.js";
 import { buildTimeline, type TimelineResult } from "./timeline.js";
 import { buildVendorChecklist, type VendorChecklistItem } from "./vendors.js";
 import { parsePlanInput, PlanInputError, type PlanInput } from "./validate.js";
+import { z } from "zod";
+
+const DoneSchema = z.array(z.string().regex(/^[a-z]-[a-z-]{2,20}$/)).max(60);
 
 export interface Plan {
   input: PlanInput;
@@ -18,7 +21,7 @@ export interface Plan {
  * One call that validates input and builds every deterministic part of the plan.
  * `rawDeals` are the bookings the user recorded (agreed price, advance paid).
  */
-export function buildPlan(raw: unknown, today: string, rawDeals: unknown = []): Plan {
+export function buildPlan(raw: unknown, today: string, rawDeals: unknown = [], rawDone: unknown = []): Plan {
   const input = parsePlanInput(raw, today);
   const dealsResult = DealsSchema.safeParse(rawDeals ?? []);
   if (!dealsResult.success) {
@@ -30,7 +33,9 @@ export function buildPlan(raw: unknown, today: string, rawDeals: unknown = []): 
   const selectors = [input.subType, ...(input.eventType === "wedding" ? input.subEvents : [])];
 
   const budget = allocateBudget(input.eventType, input.subType, input.totalBudgetINR, input.guestCount, input.cityTier);
-  const timeline = buildTimeline(input.eventType, input.eventDate, today, selectors);
+  const doneResult = DoneSchema.safeParse(rawDone ?? []);
+  if (!doneResult.success) throw new PlanInputError([{ field: "done", message: "Invalid list of completed tasks" }]);
+  const timeline = buildTimeline(input.eventType, input.eventDate, today, selectors, new Set(doneResult.data));
   // A booking task is only useful if its budget line exists for this event type.
   const lineKeys = new Set(budget.lines.map((l) => l.key));
   for (const t of timeline.tasks) if (t.books && !lineKeys.has(t.books)) delete t.books;
@@ -43,6 +48,11 @@ export function buildPlan(raw: unknown, today: string, rawDeals: unknown = []): 
     timeline,
     vendors,
     spending,
-    warnings: [...budget.warnings, ...timeline.warnings, ...spending.warnings],
+    // The "food per guest is low" advice only helps before food is booked.
+    warnings: [
+      ...budget.warnings.filter((w) => !(w.code === "FOOD_BELOW_FLOOR" && spending.lines.some((l) => l.key === "catering" && l.booked))),
+      ...timeline.warnings,
+      ...spending.warnings,
+    ],
   };
 }

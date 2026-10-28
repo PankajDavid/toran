@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPlan, PlanInputError } from "./index.js";
+import { buildPlan, EVENT_TYPES, PlanInputError, SUB_TYPES, WEDDING_SUB_EVENTS } from "./index.js";
 
 const TODAY = "2026-10-27";
 const wedding = {
@@ -24,6 +24,51 @@ describe("booking tasks link to budget lines", () => {
       const keys = new Set(plan.budget.lines.map((l) => l.key));
       for (const t of plan.timeline.tasks) if (t.books) expect(keys.has(t.books)).toBe(true);
     }
+  });
+});
+
+describe("every budget line has a timeline task that books it", () => {
+  // Pankaj found a birthday where every task was done but food and photography were never booked.
+  it.each(
+    EVENT_TYPES.flatMap((eventType) =>
+      SUB_TYPES[eventType].flatMap((subType) =>
+        eventType === "wedding" ? [[eventType, subType, [...WEDDING_SUB_EVENTS]], [eventType, subType, ["ceremony"]]] : [[eventType, subType, []]],
+      ),
+    ) as [string, string, string[]][],
+  )("%s / %s %j", (eventType, subType, subEvents) => {
+    const plan = buildPlan({ eventType, subType, ...(eventType === "wedding" ? { subEvents } : {}), totalBudgetINR: 5_00_000, guestCount: 200, cityTier: 2, eventDate: "2027-06-01" }, TODAY);
+    const booked = new Set(plan.timeline.tasks.map((t) => t.books).filter(Boolean));
+    const missing = plan.budget.lines.filter((l) => l.key !== "contingency" && !booked.has(l.key)).map((l) => l.key);
+    expect(missing).toEqual([]);
+  });
+});
+
+describe("warnings stay relevant after bookings", () => {
+  const party = { eventType: "birthday", subType: "kid", totalBudgetINR: 25_000, guestCount: 20, cityTier: 2, eventDate: "2026-11-20" };
+  it("drops the low food-per-guest advice once food is booked", () => {
+    expect(buildPlan(party, TODAY).warnings.map((w) => w.code)).toContain("FOOD_BELOW_FLOOR");
+    const booked = buildPlan(party, TODAY, [{ taskId: "b-food", agreedINR: 6_000, advanceINR: 0 }]);
+    expect(booked.warnings.map((w) => w.code)).not.toContain("FOOD_BELOW_FLOOR");
+  });
+  it("says the overspend is final when everything is booked", () => {
+    const all = buildPlan(party, TODAY).budget.lines.filter((l) => l.key !== "contingency").map((l) => ({ lineKey: l.key, agreedINR: l.amountINR + 500, advanceINR: 0 }));
+    const msg = buildPlan(party, TODAY, all).warnings.find((w) => w.code === "OVER_BUDGET")!.message;
+    expect(msg).toContain("Everything is booked");
+  });
+});
+
+describe("completed tasks are never counted as late", () => {
+  it("counts only unfinished late tasks", () => {
+    const soon = { eventType: "birthday", subType: "kid", totalBudgetINR: 25_000, guestCount: 20, cityTier: 2, eventDate: "2026-10-29" };
+    const all = buildPlan(soon, TODAY).timeline;
+    expect(all.lateCount).toBeGreaterThan(3);
+    const lateIds = all.tasks.filter((t) => t.status === "late").map((t) => t.id);
+    const finished = buildPlan(soon, TODAY, [], lateIds).timeline;
+    expect(finished.lateCount).toBe(0);
+    expect(finished.warnings).toEqual([]);
+  });
+  it("rejects a malformed done list", () => {
+    expect(() => buildPlan(wedding, TODAY, [], ["<script>"])).toThrow(PlanInputError);
   });
 });
 
@@ -104,10 +149,10 @@ describe("reconcileBudget — deal closed", () => {
     expect(s.agreedINR + unbooked + s.contingencyNowINR).toBe(s.projectedSpendINR);
   });
 
-  it("records a cost directly on a budget line that no task books", () => {
+  it("records a cost directly on a budget line (without ticking a task)", () => {
     const anniv = { eventType: "party", subType: "anniversary", totalBudgetINR: 1_00_000, guestCount: 50, cityTier: 2, eventDate: "2027-01-10", diet: "veg" };
     const plan = buildPlan(anniv, TODAY);
-    expect(plan.timeline.tasks.some((t) => t.books === "photo-video")).toBe(false); // the gap Pankaj found
+    expect(plan.timeline.tasks.some((t) => t.books === "photo-video")).toBe(true); // the gap Pankaj found is now closed
     const s = buildPlan(anniv, TODAY, [{ lineKey: "photo-video", agreedINR: 2_000, advanceINR: 500 }]).spending;
     const photo = s.lines.find((l) => l.key === "photo-video")!;
     expect(photo).toMatchObject({ booked: true, agreedINR: 2_000, advanceINR: 500, dueINR: 1_500, differenceINR: 2_000 - 7_000 });

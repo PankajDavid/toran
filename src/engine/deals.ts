@@ -137,7 +137,11 @@ export function reconcileBudget(budget: BudgetResult, tasks: readonly TimelineTa
     warnings.push({
       code: "OVER_BUDGET",
       severity: "warning",
-      message: `Your bookings are ${inr(-savingsINR)} above plan. The contingency buffer covers ${inr(contingencyPlannedINR)}, so you are ${inr(overBudgetINR)} over your total budget. Look for savings in the lines not yet booked.`,
+      message: `Your bookings are ${inr(-savingsINR)} above plan. The contingency buffer covers ${inr(contingencyPlannedINR)}, so you are ${inr(overBudgetINR)} over your total budget. ${
+        lines.some((l) => !l.booked && l.key !== "contingency")
+          ? "Look for savings in the lines not yet booked."
+          : "Everything is booked, so this is your final overspend unless you renegotiate a booking."
+      }`,
     });
   } else if (savingsINR < 0) {
     warnings.push({

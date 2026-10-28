@@ -295,10 +295,12 @@
     ];
   }
 
-  /** Re-runs the calculator (no AI) after a booking changes. */
+  const doneList = () => Object.keys(state.done || {}).filter((k) => state.done[k]);
+
+  /** Re-runs the calculator (no AI) after a booking or tick changes. */
   async function refreshPlan() {
     try {
-      state.plan = await api("/api/plan", { ...state.planInput, deals: dealList() });
+      state.plan = await api("/api/plan", { ...state.planInput, deals: dealList(), done: doneList() });
       save();
     } catch {
       $("warnings").prepend(el("p", { class: "warning" }, "Couldn't update the budget just now. Please try again."));
@@ -318,7 +320,7 @@
 
   async function buildPlan(planInput) {
     try {
-      const plan = await api("/api/plan", { ...planInput, deals: dealList() });
+      const plan = await api("/api/plan", { ...planInput, deals: dealList(), done: doneList() });
       state.planInput = planInput;
       state.plan = plan;
       state.ideas = null;
@@ -382,6 +384,11 @@
       msg,
       el("div", { class: "booking-actions" },
         el("button", { type: "submit", class: "btn-primary" }, "Save"),
+        tasks.length ? null : el("button", { type: "button", class: "btn-quiet", onclick: () => {
+          state.lineCosts[line.key] = { agreedINR: 0, advanceINR: 0 };
+          save();
+          refreshPlan();
+        } }, "Not needed (₹0)"),
         el("button", { type: "button", class: "btn-quiet", onclick: () => row.remove() }, "Cancel")));
 
     form.addEventListener("submit", (e) => {
@@ -404,7 +411,7 @@
       }
       for (const { f, value } of updates) {
         if (f.kind === "task") state.deals[f.id] = value;
-        else if (value && value.agreedINR > 0) state.lineCosts[f.id] = value;
+        else if (value) state.lineCosts[f.id] = value; // ₹0 = "not needed", kept on purpose
         else delete state.lineCosts[f.id];
       }
       save();
@@ -430,10 +437,16 @@
       el("div", { class: "booking-actions" },
         el("button", { type: "submit", class: "btn-primary" }, "Save booking"),
         el("button", { type: "button", class: "btn-quiet", onclick: () => {
+          state.deals[task.id] = { agreedINR: 0, advanceINR: 0 };
           state.done[task.id] = true;
           save();
-          renderPlan();
-        } }, "Just mark done"),
+          refreshPlan();
+        } }, "Not needed (₹0)"),
+        el("button", { type: "button", class: "btn-quiet", onclick: () => {
+          state.done[task.id] = true;
+          save();
+          refreshPlan();
+        } }, "Done, cost later"),
         el("button", { type: "button", class: "btn-quiet", onclick: () => form.remove() }, "Cancel")));
     form.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -485,7 +498,8 @@
         tile("Booked", inr(sp.agreedINR), `estimated ${inr(sp.bookedPlannedINR)}${diff ? ` · ${diff > 0 ? inr(diff) + " over" : inr(-diff) + " saved"}` : ""}`, diff > 0 ? "warn" : diff < 0 ? "good" : ""),
         tile("Paid so far", inr(sp.advanceINR)),
         tile("Balance due", inr(sp.dueINR), "on bookings made"),
-        tile("Still to book", inr(sp.unbookedPlannedINR), "estimated"),
+        tile("Still to book", inr(sp.unbookedPlannedINR),
+          sp.unbookedPlannedINR ? sp.lines.filter((l) => !l.booked && l.key !== "contingency").map((l) => l.label).join(", ") : "everything is booked"),
         sp.overBudgetINR
           ? tile("Over budget", inr(sp.overBudgetINR), "after using the buffer", "over")
           : tile("Buffer left", inr(sp.contingencyNowINR), `planned ${inr(sp.contingencyPlannedINR)}`),
@@ -514,7 +528,7 @@
         onclick: (e) => openLineCost(e.currentTarget.closest("tr"), l),
       }, hasCost ? "Edit cost" : "Record cost");
       return el("tr", { class: l.booked ? "booked" : "" },
-        el("th", { scope: "row" }, l.label, l.booked ? el("span", { class: "badge booked" }, "booked") : null, note, bar, costBtn),
+        el("th", { scope: "row" }, l.label, l.booked ? el("span", { class: "badge booked" }, l.agreedINR === 0 ? "not needed" : "booked") : null, note, bar, costBtn),
         el("td", { class: "num" }, inr(amount)),
         el("td", { class: "num share" }, pct(bpByKey[l.key])));
     }));
@@ -548,13 +562,13 @@
           return;
         }
         save();
-        renderPlan();
+        refreshPlan();
       });
       const when = t.status === "late" ? `Ideally by ${fmtDate(t.idealDate)} · do it now` : `By ${fmtDate(t.dueDate)}`;
       li.append(box,
         el("label", { for: id }, t.title,
           !done && t.status !== "upcoming" ? el("span", { class: `badge ${t.status}` }, t.status === "late" ? "late" : "this week") : null,
-          el("span", { class: "when" }, deal ? `Booked for ${inr(deal.agreedINR)} · advance ${inr(deal.advanceINR)}` : when)));
+          el("span", { class: "when" }, deal ? (deal.agreedINR === 0 ? "Not needed" : `Booked for ${inr(deal.agreedINR)} · advance ${inr(deal.advanceINR)}`) : when)));
       return li;
     }));
 
@@ -713,12 +727,13 @@
     const lineCosts = pick(payload.l);
     try {
       // The server re-validates everything; a tampered link just fails.
-      const plan = await api("/api/plan", { ...payload.i, deals: [
+      const doneIds = (Array.isArray(payload.t) ? payload.t : []).filter((x) => typeof x === "string" && /^[a-z]-[a-z-]{2,20}$/.test(x));
+      const plan = await api("/api/plan", { ...payload.i, done: doneIds, deals: [
         ...Object.entries(deals).map(([taskId, d]) => ({ taskId, ...d })),
         ...Object.entries(lineCosts).map(([lineKey, d]) => ({ lineKey, ...d })),
       ] });
       state = { ...fresh(), known: { ...payload.i }, planInput: payload.i, plan, deals, lineCosts,
-        done: Object.fromEntries((Array.isArray(payload.t) ? payload.t : []).filter((x) => typeof x === "string").map((x) => [x, true])) };
+        done: Object.fromEntries(doneIds.map((x) => [x, true])) };
       save();
       renderKnown();
       renderPlan();
