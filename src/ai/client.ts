@@ -25,10 +25,26 @@ export interface AiJsonRequest {
   timeoutMs?: number;
 }
 
+export interface WebSource {
+  url: string;
+  title: string;
+}
+
+export interface GroundedResult {
+  /** Parsed JSON (unknown shape — callers MUST validate). */
+  json: unknown;
+  /** Pages Google Search returned for this answer. Empty = nothing to cite. */
+  sources: WebSource[];
+  /** The searches Google ran, shown as "search on Google" links. */
+  searchQueries: string[];
+}
+
 export interface AiClient {
   readonly available: boolean;
   /** Returns parsed JSON (unknown shape — callers MUST validate). Throws AiError on any failure. */
   generateJson(req: AiJsonRequest): Promise<unknown>;
+  /** Same, but the model may use Google Search; returns the pages it used. Optional: fakes may omit it. */
+  generateGrounded?(req: AiJsonRequest): Promise<GroundedResult>;
 }
 
 export class AiError extends Error {
@@ -64,8 +80,62 @@ export function createGeminiClient(opts: GeminiOptions): AiClient {
     fast: opts.fastModel || "gemini-3.5-flash-lite",
   };
 
+  /** Pulls JSON out of a reply that may wrap it in ``` fences or prose. */
+  const parseLoose = (text: string): unknown => {
+    const m = /\{[\s\S]*\}/.exec(text);
+    if (!m) throw new AiError("bad-output", "No JSON in AI response");
+    try { return JSON.parse(m[0]); } catch { throw new AiError("bad-output", "AI response was not valid JSON"); }
+  };
+  const upstream = (err: unknown) => {
+    const e = err as { status?: number; message?: string };
+    const statusWord = /\b(NOT_FOUND|PERMISSION_DENIED|UNAUTHENTICATED|INVALID_ARGUMENT|RESOURCE_EXHAUSTED|FAILED_PRECONDITION|UNAVAILABLE)\b/.exec(e?.message ?? "")?.[1];
+    return new AiError("upstream", "AI request failed", [e?.status, statusWord].filter(Boolean).join(" ") || undefined);
+  };
+
   return {
     available: true,
+    async generateGrounded(req) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), req.timeoutMs ?? 30_000);
+      const call = (withSchema: boolean) =>
+        genai.models.generateContent({
+          model: models[req.tier ?? "smart"],
+          contents: [{ role: "user", parts: req.parts }],
+          config: {
+            systemInstruction: req.system,
+            tools: [{ googleSearch: {} }],
+            // Gemini 3 can combine search with a JSON schema; if a model refuses, retry asking for JSON in text.
+            ...(withSchema ? { responseMimeType: "application/json", responseJsonSchema: req.schema } : {}),
+            thinkingConfig: { thinkingLevel: req.thinking === "minimal" ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW },
+            abortSignal: controller.signal,
+          },
+        });
+      try {
+        let res;
+        try {
+          res = await call(true);
+        } catch (err) {
+          if (controller.signal.aborted || !/INVALID_ARGUMENT/.test((err as Error)?.message ?? "")) throw err;
+          res = await call(false);
+        }
+        const text = res.text;
+        if (!text) throw new AiError("bad-output", "Empty AI response");
+        const meta = res.candidates?.[0]?.groundingMetadata;
+        const sources: WebSource[] = [];
+        for (const c of meta?.groundingChunks ?? []) {
+          const uri = c.web?.uri;
+          if (!uri || sources.some((x) => x.url === uri)) continue;
+          sources.push({ url: uri, title: c.web?.title || "web page" });
+        }
+        return { json: parseLoose(text), sources, searchQueries: (meta?.webSearchQueries ?? []).slice(0, 4) };
+      } catch (err) {
+        if (err instanceof AiError) throw err;
+        if (controller.signal.aborted) throw new AiError("timeout", "AI request timed out");
+        throw upstream(err);
+      } finally {
+        clearTimeout(timer);
+      }
+    },
     async generateJson(req) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), req.timeoutMs ?? 20_000);
@@ -95,9 +165,7 @@ export function createGeminiClient(opts: GeminiOptions): AiClient {
         if (controller.signal.aborted) throw new AiError("timeout", "AI request timed out");
         // Never surface upstream messages to users; they can contain request details.
         // Keep only the HTTP status and Google's status word for server-side diagnosis.
-        const e = err as { status?: number; message?: string };
-        const statusWord = /\b(NOT_FOUND|PERMISSION_DENIED|UNAUTHENTICATED|INVALID_ARGUMENT|RESOURCE_EXHAUSTED|FAILED_PRECONDITION|UNAVAILABLE)\b/.exec(e?.message ?? "")?.[1];
-        throw new AiError("upstream", "AI request failed", [e?.status, statusWord].filter(Boolean).join(" ") || undefined);
+        throw upstream(err);
       } finally {
         clearTimeout(timer);
       }

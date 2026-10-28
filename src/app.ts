@@ -10,6 +10,7 @@ import { runInterviewTurn, TurnSchema } from "./interview/interview.js";
 import { MAX_QUOTE_BYTES, QUOTE_MIME, readQuote, sniffMime, type QuoteMime } from "./ai/quoteReader.js";
 import { checkQuote, QuoteSchema, vendorMessage } from "./engine/quote.js";
 import { z } from "zod";
+import { findPrices, PriceRequestSchema, type PriceResult } from "./ai/prices.js";
 import { FindVendorsSchema, placesClientFromEnv, type PlacesClient } from "./places/places.js";
 
 const OVERRIDE_HEADERS = ["x-http-method-override", "x-http-method", "x-method-override", "x-original-url", "x-rewrite-url"];
@@ -219,6 +220,45 @@ export function createApp(opts: AppOptions = {}) {
       const e = err as { kind?: string; detail?: string };
       console.warn(`Places search failed (${e.kind ?? "error"}${e.detail ? ` ${e.detail}` : ""})`);
       res.status(502).json({ error: "Couldn't search Google Maps just now. Please try again in a minute." });
+    }
+  });
+
+  // Web prices change slowly and each lookup is a search + AI call: remember answers
+  // per service and city for a day (no user data in the key or the value).
+  const priceCache = new Map<string, { at: number; result: PriceResult }>();
+  const PRICE_TTL = 24 * 60 * 60_000;
+
+  /** Typical prices from the web with their sources, for budgeting only. */
+  app.post("/api/prices", aiLimiter, async (req, res) => {
+    const parsed = PriceRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Please enter a city name." });
+      return;
+    }
+    if (!ai.available) {
+      res.status(503).json({ error: "Price lookup needs the AI, which is offline right now." });
+      return;
+    }
+    const { category, city, guestCount } = parsed.data;
+    const key = `${category}|${city.toLowerCase()}`;
+    const hit = priceCache.get(key);
+    try {
+      let result: PriceResult;
+      if (hit && Date.now() - hit.at < PRICE_TTL) result = hit.result;
+      else {
+        result = await findPrices({ category, city }, ai);
+        if (priceCache.size > 500) priceCache.clear();
+        priceCache.set(key, { at: Date.now(), result });
+      }
+      // Guest totals are per request, worked out by code on the cached range.
+      if (result.found && guestCount && (result.unit === "per plate" || result.unit === "per person")) {
+        result = { ...result, totalLowINR: result.lowINR * guestCount, totalHighINR: result.highINR * guestCount };
+      }
+      res.json(result);
+    } catch (err) {
+      const e = err as { kind?: string; detail?: string };
+      console.warn(`Price lookup failed (${e.kind ?? "error"}${e.detail ? ` ${e.detail}` : ""})`);
+      res.status(502).json({ error: "Couldn't look up prices just now. Please try again in a minute." });
     }
   });
 
