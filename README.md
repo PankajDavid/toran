@@ -56,7 +56,7 @@ We also tried Gemini's Google Search grounding for live market prices. Productio
 
 ```bash
 npm install
-npm test          # 355 unit and API tests
+npm test          # 358 unit and API tests
 npm run test:coverage  # coverage: 99% of lines, 89% of branches; CI fails below 95% / 85%
 npm run typecheck
 npm run lint      # Biome: lint + format check (TypeScript, browser JS, CSS)

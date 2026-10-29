@@ -68,4 +68,4 @@ One stylesheet per area, linked in cascade order: `base` (brand colour tokens, r
 
 ## Quality gates (CI on every push)
 
-`npm audit` (production) · TypeScript strict (server) and `checkJs` (browser) · Biome lint and format, cognitive complexity ≤ 20 per function · 355 unit and API tests with coverage ≥ 95% lines · build · 34 Playwright browser tests on phone and desktop, including an axe WCAG 2.2 AA scan of 13 screens and states.
+`npm audit` (production) · TypeScript strict (server) and `checkJs` (browser) · Biome lint and format, cognitive complexity ≤ 20 per function · 358 unit and API tests with coverage ≥ 95% lines · build · 34 Playwright browser tests on phone and desktop, including an axe WCAG 2.2 AA scan of 13 screens and states.
