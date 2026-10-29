@@ -1,0 +1,184 @@
+/* Vendor checklist and tracker, Google Maps search results, and check-prices links. */
+
+details.vendor {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+}
+
+details.vendor summary {
+  cursor: pointer;
+  font-weight: 600;
+  min-height: 32px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+details.vendor summary .v-planned {
+  margin-left: auto;
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.v-label {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.v-questions {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}
+
+.v-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.v-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.v-item.s-confirmed {
+  border-color: var(--leaf);
+  box-shadow: inset 4px 0 0 var(--leaf);
+}
+
+.v-item.s-not-chosen {
+  opacity: 0.65;
+}
+
+.v-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  align-items: center;
+}
+
+.v-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.v-phone,
+.v-note {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.v-status {
+  min-height: 40px;
+  font: inherit;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  background: #fff;
+}
+
+.v-item .row-actions {
+  margin-top: 8px;
+}
+
+.v-add {
+  margin: 8px 0 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+
+.v-add-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 12px;
+}
+
+.v-find {
+  margin: 10px 0 6px;
+}
+
+.v-find-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.v-find-form input {
+  flex: 1 1 160px;
+  min-width: 0;
+  min-height: 44px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 0 12px;
+  font: inherit;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.v-find-status {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  min-height: 1em;
+}
+
+.v-found {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.v-found-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--paper);
+}
+
+.v-found-item .row-actions {
+  margin-top: 8px;
+}
+
+.v-price {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff1d6;
+  border: 1px solid #f4d79a;
+}
+
+.v-price p {
+  margin: 2px 0;
+}
+
+.v-price-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.v-gsearch {
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.v-vouch {
+  margin-top: 8px;
+}

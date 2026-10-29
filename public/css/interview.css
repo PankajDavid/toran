@@ -1,0 +1,158 @@
+/* The planning chat: messages, what Toran understood, quick-answer chips, the composer and voice. */
+
+.interview {
+  max-width: 720px;
+  margin: 0 auto;
+  padding-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.msg {
+  max-width: 88%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  white-space: pre-line;
+}
+
+.msg.toran {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+}
+
+.msg.you {
+  background: var(--kumkum);
+  color: #fff;
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+}
+
+.msg.thinking {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.known {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.known-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.known-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.known-list button {
+  border: 1px solid var(--line);
+  background: var(--cream);
+  border-radius: 999px;
+  padding: 4px 12px;
+  min-height: 36px;
+  color: var(--ink);
+}
+
+.known-list button.guess {
+  background: var(--guess);
+  border-color: var(--marigold-deep);
+}
+
+.known-hint {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.answer {
+  position: sticky;
+  bottom: 0;
+  background: var(--cream);
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--line);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.chip {
+  border: 1.5px solid var(--kumkum);
+  color: var(--kumkum);
+  background: var(--paper);
+  border-radius: 999px;
+  padding: 6px 14px;
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.chip:hover {
+  background: #fbe9ec;
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--kumkum);
+  color: #fff;
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.composer input[type="text"],
+.composer input[type="date"] {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 0 18px;
+  font: inherit;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.composer input:focus {
+  border-color: var(--marigold-deep);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(224, 123, 0, 0.25);
+}
+
+.mic-status {
+  margin: 6px 4px 0;
+  font-size: 14px;
+  color: var(--muted);
+  min-height: 1em;
+}
+
+@media (max-width: 760px) {
+  .msg {
+    max-width: 94%;
+  }
+}

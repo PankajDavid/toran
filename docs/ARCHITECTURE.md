@@ -53,6 +53,10 @@ One module per job, none over 300 lines, type-checked with `checkJs`. All text i
 | `ideas.js`, `suggest.js` | Ideas/invitation/tips; approve-before-act suggestions |
 | `share.js`, `files.js`, `install.js` | WhatsApp, plan link, backup/restore, calendar, install |
 
+## Styles (`public/css/`)
+
+One stylesheet per area, linked in cascade order: `base` (brand colour tokens, reset, buttons, form fields) first, then `layout`, one file per feature, the plan-ready animation, and `print` last so the PDF rules win. A test checks that every stylesheet is linked and cached for offline use. When the old single 1,700-line file was split, the computed style of every element was compared before and after in 11 app states, on phone, laptop and wide screens, for screen and print: identical.
+
 ## Where AI sits, and the guard around each use
 
 | Use | Model | Guard |
@@ -63,4 +67,4 @@ One module per job, none over 300 lines, type-checked with `checkJs`. All text i
 
 ## Quality gates (CI on every push)
 
-`npm audit` (production) · TypeScript strict (server) and `checkJs` (browser) · Biome lint and format, cognitive complexity ≤ 20 per function · 351 unit and API tests with coverage ≥ 95% lines · build · 30 Playwright browser tests on phone and desktop, including an axe WCAG 2.2 AA scan of 13 screens and states.
+`npm audit` (production) · TypeScript strict (server) and `checkJs` (browser) · Biome lint and format, cognitive complexity ≤ 20 per function · 352 unit and API tests with coverage ≥ 95% lines · build · 30 Playwright browser tests on phone and desktop, including an axe WCAG 2.2 AA scan of 13 screens and states.

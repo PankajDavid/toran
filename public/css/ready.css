@@ -1,0 +1,105 @@
+/* The plan-ready animation: a tick on each marigold, then one in the o of Toran. Respects reduced motion. */
+
+.ready {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: var(--cream);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  animation: ready-out 0.5s ease 3.4s forwards;
+}
+
+.ready-garland {
+  width: min(440px, 88vw);
+  height: auto;
+}
+
+.ready-word {
+  display: flex;
+  align-items: baseline;
+  font-family: "Rozha One", Georgia, serif;
+  font-size: clamp(80px, 22vw, 136px);
+  line-height: 1;
+  color: var(--kumkum);
+}
+
+.ready-o {
+  width: 0.56em;
+  height: 0.56em;
+  margin: 0 0.02em 0 0.03em;
+}
+
+.ready-text {
+  margin: 10px 0 0;
+  font-size: 22px;
+  color: var(--muted);
+  opacity: 0;
+  animation: fade-in 0.4s ease 2.7s forwards;
+}
+
+.tick {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: draw 0.35s ease forwards;
+}
+
+.t1 {
+  animation-delay: 0.4s;
+}
+
+.t2 {
+  animation-delay: 0.8s;
+}
+
+.t3 {
+  animation-delay: 1.2s;
+}
+
+.t4 {
+  animation-delay: 1.6s;
+}
+
+.t5 {
+  stroke-dasharray: 120;
+  stroke-dashoffset: 120;
+  animation-delay: 2.1s;
+  animation-duration: 0.5s;
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ready-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tick,
+  .t5 {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .ready-text {
+    animation: none;
+    opacity: 1;
+  }
+  .ready {
+    animation-delay: 1.2s;
+  }
+}

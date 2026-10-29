@@ -1,0 +1,45 @@
+/* Timeline task list with due dates and late / this-week badges. */
+
+.tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.task {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.task > input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  margin-top: 3px;
+  accent-color: var(--leaf);
+  flex: none;
+}
+
+.task label {
+  flex: 1;
+  cursor: pointer;
+}
+
+.task .when {
+  display: block;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.task.done label {
+  color: var(--muted);
+  text-decoration: line-through;
+}

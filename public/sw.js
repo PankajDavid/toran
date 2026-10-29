@@ -1,10 +1,20 @@
 // Toran service worker: lets the app open fast and work offline, and makes it installable.
 // Network first, so updates always arrive; the cache is only a fallback.
 // API calls are never cached (plans are built fresh and never stored here).
-const CACHE = "toran-v19";
+const CACHE = "toran-v20";
 const SHELL = [
   "/",
-  "/app.css",
+  "/css/base.css",
+  "/css/layout.css",
+  "/css/interview.css",
+  "/css/budget.css",
+  "/css/timeline.css",
+  "/css/vendors.css",
+  "/css/quote.css",
+  "/css/ideas.css",
+  "/css/share.css",
+  "/css/ready.css",
+  "/css/print.css",
   "/fonts/fonts.css",
   "/favicon.svg",
   "/brand/toran-garland.svg",

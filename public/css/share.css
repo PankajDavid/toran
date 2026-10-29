@@ -1,0 +1,103 @@
+/* Share and keep (plan actions, install card) and Toran suggests. */
+
+.plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.share-note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 40rem;
+}
+
+.install {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--paper);
+  border: 1.5px solid var(--marigold);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.install h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.install p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  max-width: 40rem;
+}
+
+.install-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Toran suggests */
+.suggest {
+  margin: 0 0 16px;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  background: var(--paper);
+  border: 1.5px solid var(--marigold);
+}
+
+.suggest h2 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--kumkum);
+}
+
+.suggest .card-sub {
+  margin: 2px 0 8px;
+}
+
+.suggest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.suggestion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--cream);
+}
+
+.sg-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.sg-text span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.sg-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

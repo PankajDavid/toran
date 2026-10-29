@@ -1,0 +1,296 @@
+/* Design tokens (brand colours), reset, focus, buttons, badges, form fields, shared bits. */
+
+:root {
+  --kumkum: #b3203a;
+  --kumkum-dark: #8a1830;
+  --marigold: #f4a300;
+  --marigold-deep: #e07b00;
+  --leaf: #2f7d4a;
+  --cream: #fff6e6;
+  --paper: #fffdf8;
+  --ink: #2b1b10;
+  --muted: #6b4a2e;
+  --line: #ead9bf;
+  --guess: #fde7b0;
+  --late: #b3203a;
+  --soon: #9a5a00;
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: "Baloo 2", system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.skip {
+  position: absolute;
+  left: -999px;
+  top: 8px;
+  background: var(--ink);
+  color: var(--cream);
+  padding: 8px 12px;
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.skip:focus {
+  left: 8px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--marigold-deep);
+  outline-offset: 2px;
+}
+
+a {
+  color: var(--kumkum);
+}
+
+a:hover {
+  color: var(--kumkum-dark);
+}
+
+/* Buttons */
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--kumkum);
+  color: #fff;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-weight: 700;
+  min-height: 44px;
+}
+
+.btn-primary:hover {
+  background: var(--kumkum-dark);
+}
+
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.btn-big {
+  font-size: 20px;
+  padding: 14px 36px;
+  margin-top: 24px;
+}
+
+.btn-quiet {
+  background: transparent;
+  border: 1.5px solid var(--line);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 16px;
+  min-height: 40px;
+  font-weight: 600;
+}
+
+.btn-quiet:hover {
+  border-color: var(--muted);
+}
+
+.btn-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.btn-icon[aria-pressed="true"] {
+  background: var(--kumkum);
+  color: #fff;
+  border-color: var(--kumkum);
+}
+
+.card-note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0 8px;
+  margin-left: 6px;
+  vertical-align: 2px;
+}
+
+.badge.late {
+  background: #fbe3e7;
+  color: var(--late);
+}
+
+.badge.due-soon {
+  background: #fff1d6;
+  color: var(--soon);
+}
+
+.source-note {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+.badge.booked {
+  background: #e3f1e7;
+  color: var(--leaf);
+}
+
+@media (max-width: 760px) {
+  body {
+    font-size: 16px;
+  }
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.btn-link:hover {
+  color: #fff;
+}
+
+/* A button that looks like a link (Record cost, Book this). */
+.link-btn {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 0;
+  min-height: 32px;
+  background: none;
+  border: 0;
+  color: var(--kumkum);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.link-btn:hover {
+  color: var(--kumkum-dark);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.field input,
+.field select,
+#quote-category {
+  min-height: 44px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 0 12px;
+  font: inherit;
+  background: var(--paper);
+  color: var(--ink);
+  min-width: 0;
+}
+
+.file-btn {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+#quote-file:focus-visible + .btn-quiet,
+.file-btn:focus-within {
+  outline: 3px solid var(--marigold-deep);
+}
+
+.fineprint-left {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.icon-x {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: none;
+  font-size: 22px;
+  color: var(--muted);
+  border-radius: 8px;
+}
+
+.icon-x:hover {
+  background: #fbe3e7;
+  color: var(--late);
+}
+
+.badge.good {
+  background: #e3f1e7;
+  color: var(--leaf);
+}
+
+.badge.talks {
+  background: #fff1d6;
+  color: var(--soon);
+}
+
+.chip-link {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+  background: #fff;
+  color: var(--ink);
+  text-decoration: none;
+}

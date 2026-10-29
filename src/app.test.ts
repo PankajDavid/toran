@@ -126,7 +126,7 @@ describe("HTTP API", () => {
   });
 
   it("app files are always revalidated so updates show on the next open", async () => {
-    for (const f of ["/", "/js/main.js", "/js/plan.js", "/app.css", "/sw.js", "/manifest.webmanifest"]) {
+    for (const f of ["/", "/js/main.js", "/js/plan.js", "/css/base.css", "/sw.js", "/manifest.webmanifest"]) {
       expect((await fetch(`${base}${f}`)).headers.get("cache-control")).toBe("no-cache");
     }
     expect((await fetch(`${base}/favicon.svg`)).headers.get("cache-control")).toContain("max-age=86400");
@@ -177,7 +177,7 @@ describe("static files", () => {
     const s = createApp({ ai: offlineClient }).listen(0);
     await new Promise((r) => s.once("listening", r));
     const base = `http://127.0.0.1:${(s.address() as import("node:net").AddressInfo).port}`;
-    const files = ["/", "/js/main.js", "/js/plan.js", "/app.css", "/favicon.svg", "/js/quote.js", "/js/vendors.js", "/js/store.js"];
+    const files = ["/", "/js/main.js", "/js/plan.js", "/css/quote.css", "/favicon.svg", "/js/quote.js", "/js/vendors.js", "/js/store.js"];
     const statuses = await Promise.all(Array.from({ length: 40 }, (_, i) => fetch(base + files[i % files.length]).then((r) => r.status)));
     expect(new Set(statuses)).toEqual(new Set([200]));
     await new Promise<void>((r) => s.close(() => r()));
@@ -193,5 +193,17 @@ describe("offline cache list (service worker)", () => {
     const modules = (await readdir("public/js")).filter((f) => f.endsWith(".js")).map((f) => `/js/${f}`);
     for (const m of modules) expect(list).toContain(m);
     for (const f of list.filter((x) => x !== "/")) await access(`public${f}`);
+  });
+
+  it("every stylesheet is linked by the page (base first, print last) and cached for offline", async () => {
+    const { readFile, readdir } = await import("node:fs/promises");
+    const sw = await readFile("public/sw.js", "utf8");
+    const html = await readFile("public/index.html", "utf8");
+    const linked = [...html.matchAll(/<link rel="stylesheet" href="(\/css\/[^"]+)">/g)].map((m) => m[1]);
+    const sheets = (await readdir("public/css")).filter((f) => f.endsWith(".css")).map((f) => `/css/${f}`);
+    expect([...linked].sort()).toEqual([...sheets].sort());
+    expect(linked[0]).toBe("/css/base.css"); // tokens and reset come first
+    expect(linked.at(-1)).toBe("/css/print.css"); // print rules override everything
+    for (const s of sheets) expect(sw).toContain(`"${s}"`);
   });
 });

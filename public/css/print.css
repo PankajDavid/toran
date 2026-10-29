@@ -1,0 +1,106 @@
+/* Print / Save as PDF: one clean column, every section shown, no buttons. */
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  body {
+    background: #fff;
+    font-size: 12pt;
+  }
+  .topbar,
+  .skip,
+  .plan-actions,
+  .share-note,
+  .install,
+  #get-ideas,
+  .refine,
+  .booking,
+  .row-actions,
+  #welcome,
+  #interview,
+  .ready,
+  .task > input[type="checkbox"] {
+    display: none !important;
+  }
+  main {
+    max-width: none;
+    padding: 0;
+  }
+  .grid {
+    display: block;
+  }
+  .card {
+    border: 1px solid #ccc;
+    break-inside: avoid-page;
+    margin-bottom: 12px;
+    padding: 12px;
+  }
+  .tasks {
+    max-height: none;
+    overflow: visible;
+  }
+  .task {
+    break-inside: avoid;
+  }
+  .task.done label {
+    text-decoration: none;
+  }
+  .task.done label::before {
+    content: "✓ ";
+    color: var(--leaf);
+    font-weight: 700;
+  }
+  .warning {
+    border-color: #999;
+    background: #fff;
+  }
+  .bar {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .plan-title {
+    color: #b3203a;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}
+
+@media print {
+  .link-btn,
+  .cost-row {
+    display: none !important;
+  }
+}
+
+@media print {
+  .quote-card {
+    display: none !important;
+  }
+}
+
+/* The PDF shows every section, not just the open tab. */
+@media print {
+  .plan-nav,
+  .features {
+    display: none !important;
+  }
+  .plan-body {
+    display: block !important;
+  }
+  .plan .card[hidden] {
+    display: block !important;
+  }
+  #get-invitation,
+  #get-tips {
+    display: none !important;
+  }
+}
+
+@media print {
+  .suggest {
+    display: none !important;
+  }
+}

@@ -56,7 +56,7 @@ We also tried Gemini's Google Search grounding for live market prices. Productio
 
 ```bash
 npm install
-npm test          # 351 unit and API tests
+npm test          # 352 unit and API tests
 npm run test:coverage  # coverage: 98% of lines, 88% of branches; CI fails below 95% / 85%
 npm run typecheck
 npm run lint      # Biome: lint + format check (TypeScript, browser JS, CSS)
@@ -72,7 +72,7 @@ Browser tests (`e2e/`) drive the real app on a phone and a desktop screen: the H
 
 - TypeScript strict on the server; the browser code (plain ES modules, no build step) is type-checked with `checkJs`.
 - Biome lints and formats everything; every function is kept at cognitive complexity 20 or less, enforced in CI.
-- One module per job: no browser file over 300 lines; each quote check, interview step and suggestion is its own small, documented function.
+- One module per job: no browser script over 300 lines, one stylesheet per area; each quote check, interview step and suggestion is its own small, documented function.
 - Refactors are checked by behaviour, not just by tests: the interview parser was compared against its previous version on 28,000 inputs, the Quote Checker on every sample quotation.
 
 ## Accessibility
@@ -84,7 +84,9 @@ Keyboard-operable throughout (sections menu is an ARIA tablist with arrow keys),
 Full write-up: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Security design: [SECURITY.md](SECURITY.md).
 
 ```
-public/            Plain HTML and CSS, PWA files (no framework, no build step)
+public/            Plain HTML, PWA files (no framework, no build step)
+public/css/        One stylesheet per area: base (tokens), layout, interview, budget, timeline,
+                   vendors, quote, ideas, share, ready (animation), print
 public/js/         Browser ES modules, one job each (none over 300 lines), type-checked with checkJs:
                    interview, plan, nav, costs, booking, vendors, vendor-find, vendor-contact,
                    quote, quote-read, quote-verdict, ideas, share, files, suggest, install, store, dom, format, main
