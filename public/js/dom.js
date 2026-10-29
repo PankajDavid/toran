@@ -36,9 +36,23 @@ export function el(tag, attrs, ...children) {
   return node;
 }
 
-/** Shows one of the three screens. @param {"welcome" | "interview" | "plan"} screen */
+/** Set on the first tap or key press: until then the page is just opening, and focus is left alone. */
+let interacted = false;
+for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, () => (interacted = true), { once: true, capture: true });
+
+/**
+ * Shows one of the three screens. After the user has done something, focus moves to the new screen's
+ * heading unless it is already inside that screen, so keyboard and screen-reader users land at its start
+ * instead of on a control that just disappeared.
+ * @param {"welcome" | "interview" | "plan"} screen
+ */
 export function show(screen) {
   for (const id of ["welcome", "interview", "plan"]) $(id).hidden = id !== screen;
   $("restart").hidden = screen === "welcome";
   window.scrollTo({ top: 0 });
+  const heading = $(screen).querySelector("h1");
+  if (heading && interacted && !$(screen).contains(document.activeElement)) {
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  }
 }

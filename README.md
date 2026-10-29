@@ -28,7 +28,7 @@ Most AI planners ask a language model to write the budget. Language models are b
 2. **Exact budget**: split by event type and style (Punjabi, South Indian, Bengali, Christian weddings; kids/adult/milestone birthdays; kitty and anniversary parties; jagran, langar, Diwali mela, society functions). Record real costs and the budget re-balances: savings go to the buffer, overspend comes out of it first.
 3. **Timeline**: every task dated back from the event day. Short notice compresses the plan and flags late tasks instead of showing impossible past dates.
 4. **Vendors**: questions to ask per category, real vendors from Google Maps (search by city or "near me", location rounded to ~1 km on the phone), a tracker from *to contact* to *confirmed*, WhatsApp the questions in one tap. Confirming a vendor books their price into the budget.
-5. **Quote Checker**: photograph a quotation. Gemini reads it into a table, you confirm every line, then code checks line maths, GST, minimum plate guarantees, items families assume are included, advance over 50% and refund terms, and writes a polite WhatsApp message with every question. Save quotes to compare; book the one you pick.
+5. **Quote Checker**: photograph a quotation. Gemini reads it into a table, you confirm every line, then code checks line maths, GST (including whether the GST amount matches its rate), minimum plate guarantees, items families assume are included, advance over 50% and refund terms, and writes a polite WhatsApp message with every question. Save quotes to compare; book the one you pick.
 6. **Toran suggests**: the next useful action, worked out by code: book the most urgent vendor, tick an overdue task, over budget, balances due, add deadlines to your calendar, save a backup. Approve or "Not now".
 7. **Ideas, Invitation, Tips**: personalised by Gemini, filtered for diet (veg/Jain) and stripped of any prices.
 8. **Share and keep**: WhatsApp summary, plan link (the plan travels in the link, never on our server), calendar file (.ics), PDF, backup file and restore, installable app (PWA).
@@ -56,12 +56,12 @@ We also tried Gemini's Google Search grounding for live market prices. Productio
 
 ```bash
 npm install
-npm test          # 352 unit and API tests
+npm test          # 355 unit and API tests
 npm run test:coverage  # coverage: 99% of lines, 89% of branches; CI fails below 95% / 85%
 npm run typecheck
 npm run lint      # Biome: lint + format check (TypeScript, browser JS, CSS)
 npm run check     # all three, as CI runs on every push
-npm run test:e2e  # 30 browser tests (Playwright) on a phone and a desktop screen
+npm run test:e2e  # 34 browser tests (Playwright) on a phone and a desktop screen
 ```
 
 Tests cover the budget (every line adds up to the exact total for every event type), timeline, bookings and re-balancing, the quote checks, suggestions (every rupee figure traced to the plan), the calendar file format, the interview parser, idea sanitising, Places result filtering and the HTTP API (validation, upload checks, offline fallbacks). AI is faked through an injected `AiClient`.

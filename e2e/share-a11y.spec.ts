@@ -123,3 +123,25 @@ test("accessibility: axe finds no WCAG 2.2 AA or best-practice problems on any s
   await page.locator(".verdict").waitFor();
   await scan("quote verdict");
 });
+
+test("keyboard focus: a new screen starts at its heading; opening the page doesn't move focus", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Let's plan" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#interview-title")).toBeFocused();
+  await page.reload();
+  await expect(page.locator("#interview")).toBeVisible();
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+});
+
+test("keyboard focus: the plan starts at its title, and the hidden upload input shows focus on its button", async ({ page }) => {
+  await makePlan(page);
+  await expect(page.locator("#plan-title")).toBeFocused();
+  await tab(page, "Quote Checker").click();
+  await page.locator("#quote-category").focus();
+  await page.keyboard.press("Tab");
+  await expect(page.locator("#quote-file")).toBeFocused();
+  const outline = (sel: string) => page.locator(sel).evaluate((e) => getComputedStyle(e).outlineStyle);
+  expect(await outline('label[for="quote-file"]')).toBe("solid");
+  expect(await outline("#quote-manual")).toBe("none"); // the button next to it is not the one focused
+});

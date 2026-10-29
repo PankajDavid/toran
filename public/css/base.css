@@ -67,6 +67,11 @@ body {
   outline-offset: 2px;
 }
 
+/* A screen heading receives focus when the screen changes; it is not a control, so no ring. */
+h1[tabindex="-1"]:focus {
+  outline: none;
+}
+
 a {
   color: var(--kumkum);
 }
@@ -248,9 +253,10 @@ button {
   cursor: pointer;
 }
 
-#quote-file:focus-visible + .btn-quiet,
-.file-btn:focus-within {
+/* The real file input is visually hidden right after its label: show its keyboard focus on the label. */
+.file-btn:has(+ input[type="file"]:focus-visible) {
   outline: 3px solid var(--marigold-deep);
+  outline-offset: 2px;
 }
 
 .fineprint-left {

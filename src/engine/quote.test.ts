@@ -119,6 +119,48 @@ describe("GST", () => {
     expect(codes(caterer({ gst: { status: "extra", ratePct: 5, amountINR: 11_300 }, totalINR: 2_47_300 }))).toContain("TOTAL_MISMATCH");
   });
 
+  it("catches a GST amount that doesn't match its rate, even when the total adds up", () => {
+    // 18% of ₹2,26,000 is ₹40,680. The quote writes ₹50,000 and a total that matches its own wrong GST.
+    const q = caterer({ gst: { status: "extra", ratePct: 18, amountINR: 50_000 }, totalINR: 2_76_000 });
+    const r = checkQuote(q, ctx);
+    const f = r.findings.find((x) => x.code === "GST_RATE_MISMATCH");
+    expect(f?.severity).toBe("problem");
+    expect(f?.message).toBe("GST at 18% on ₹2,26,000 is ₹40,680, but the quote says ₹50,000 (₹9,320 more).");
+    expect(r.findings.map((x) => x.code)).not.toContain("TOTAL_MISMATCH");
+    expect(r.correctedTotalINR).toBe(2_66_680);
+    expect(r.questions.some((x) => x.includes("Could you correct the GST amount?"))).toBe(true);
+  });
+
+  it("checks GST that is included, using the subtotal, or the total when there is no subtotal", () => {
+    // ₹10,000 + 18% = ₹11,800. A quote claiming ₹3,000 GST inside ₹13,000 is wrong.
+    const line = [{ description: "Decoration", amountINR: 10_000 }];
+    const withSub = caterer({
+      lines: line,
+      subtotalINR: 10_000,
+      gst: { status: "included", ratePct: 18, amountINR: 3_000 },
+      totalINR: 13_000,
+    });
+    expect(codes(withSub)).toContain("GST_RATE_MISMATCH");
+    expect(checkQuote(withSub, ctx).correctedTotalINR).toBe(11_800);
+    const noSub = caterer({
+      lines: [{ description: "Decoration", amountINR: 11_800 }],
+      subtotalINR: undefined,
+      gst: { status: "included", ratePct: 18, amountINR: 1_800 },
+      totalINR: 11_800,
+    });
+    expect(codes(noSub)).not.toContain("GST_RATE_MISMATCH");
+    expect(codes({ ...noSub, gst: { status: "included", ratePct: 18, amountINR: 2_500 } })).toContain("GST_RATE_MISMATCH");
+  });
+
+  it("allows CGST + SGST rounding (±₹2) and stays quiet when the rate or amount isn't written", () => {
+    expect(codes(caterer({ gst: { status: "extra", ratePct: 18, amountINR: 40_682 }, totalINR: 2_66_682 }))).not.toContain(
+      "GST_RATE_MISMATCH",
+    );
+    expect(codes(caterer({ gst: { status: "extra", ratePct: 18, amountINR: 40_683 }, totalINR: 2_66_683 }))).toContain("GST_RATE_MISMATCH");
+    expect(codes(caterer({ gst: { status: "extra", amountINR: 50_000 }, totalINR: 2_76_000 }))).not.toContain("GST_RATE_MISMATCH");
+    expect(codes(caterer({ gst: { status: "extra", ratePct: 18 }, totalINR: undefined }))).not.toContain("GST_RATE_MISMATCH");
+  });
+
   it("when GST isn't mentioned, shows what it would cost if added", () => {
     const r = checkQuote(caterer({ gst: { status: "not-mentioned" } }), ctx);
     expect(r.ifGstExtraINR).toBe(2_66_680);

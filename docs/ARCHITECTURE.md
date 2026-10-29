@@ -16,7 +16,7 @@ interview.js ── POST /api/interview ─────────────�
 plan.js ─────── POST /api/plan ───────────────────▶ engine/     budget, timeline, vendors,
                 (plan input + bookings + done)                 bookings, suggestions (no AI)
 quote-read.js ─ POST /api/quote/read (photo/PDF) ─▶ ai/quoteReader  Gemini Flash reads lines
-quote-verdict ─ POST /api/quote/check ────────────▶ engine/quote    12 plain-code checks
+quote-verdict ─ POST /api/quote/check ────────────▶ engine/quote    plain-code checks, incl. GST amount vs rate
 vendor-find.js  POST /api/vendors/find ───────────▶ places/     Google Places (New)
 ideas.js ────── POST /api/ideas ──────────────────▶ ai/ideas    Gemini writes; code filters
 files.js ────── POST /api/calendar ───────────────▶ engine/ics  RFC 5545 calendar file
@@ -68,4 +68,4 @@ One stylesheet per area, linked in cascade order: `base` (brand colour tokens, r
 
 ## Quality gates (CI on every push)
 
-`npm audit` (production) · TypeScript strict (server) and `checkJs` (browser) · Biome lint and format, cognitive complexity ≤ 20 per function · 352 unit and API tests with coverage ≥ 95% lines · build · 30 Playwright browser tests on phone and desktop, including an axe WCAG 2.2 AA scan of 13 screens and states.
+`npm audit` (production) · TypeScript strict (server) and `checkJs` (browser) · Biome lint and format, cognitive complexity ≤ 20 per function · 355 unit and API tests with coverage ≥ 95% lines · build · 34 Playwright browser tests on phone and desktop, including an axe WCAG 2.2 AA scan of 13 screens and states.

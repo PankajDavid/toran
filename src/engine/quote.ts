@@ -213,6 +213,41 @@ function checkGst(q: Quote, t: Totals): Finding[] {
   return out;
 }
 
+/** GST split into CGST and SGST is rounded twice, so allow ±₹2. */
+const GST_TOLERANCE_INR = 2;
+
+/**
+ * The written GST amount and rate, and the amount the rate actually gives. Null unless the quote writes both.
+ * Extra: rate × pre-tax amount. Included: rate × subtotal when written, else the GST inside the total.
+ */
+function gstRateGap(q: Quote, t: Totals): { base: number; expected: number; stated: number } | null {
+  const { ratePct, amountINR } = q.gst;
+  if (ratePct === undefined || amountINR === undefined || q.gst.status === "not-mentioned") return null;
+  let base: number | undefined;
+  if (q.gst.status === "extra") base = t.baseINR;
+  else if (q.subtotalINR !== undefined) base = q.subtotalINR;
+  else if (q.totalINR !== undefined) base = Math.round((q.totalINR * 100) / (100 + ratePct));
+  if (base === undefined) return null;
+  const expected = Math.round((base * ratePct) / 100);
+  return Math.abs(expected - amountINR) > GST_TOLERANCE_INR ? { base, expected, stated: amountINR } : null;
+}
+
+/** 3a. The GST amount must match the GST rate: 18% of ₹10,000 is ₹1,800, not ₹3,000. */
+function checkGstRate(q: Quote, t: Totals): Finding[] {
+  const gap = gstRateGap(q, t);
+  if (!gap) return [];
+  const rate = num(q.gst.ratePct ?? 0);
+  const diff = gap.stated - gap.expected;
+  return [
+    {
+      code: "GST_RATE_MISMATCH",
+      severity: "problem",
+      message: `GST at ${rate}% on ${inr(gap.base)} is ${inr(gap.expected)}, but the quote says ${inr(gap.stated)} (${inr(Math.abs(diff))} ${diff > 0 ? "more" : "less"}).`,
+      question: `${rate}% GST on ${inr(gap.base)} comes to ${inr(gap.expected)}, but the quote shows ${inr(gap.stated)}. Could you correct the GST amount?`,
+    },
+  ];
+}
+
 /** 3b. No subtotal written: the written total must match the items (or items + GST when GST is extra). */
 function checkWrittenTotal(q: Quote, t: Totals, already: readonly Finding[]): Finding[] {
   if (q.subtotalINR !== undefined || q.totalINR === undefined || t.unpriced || already.some((f) => f.code === "TOTAL_MISMATCH")) return [];
@@ -397,11 +432,13 @@ function correctedTotal(q: Quote, t: Totals): number | null {
     const expected = expectedAmount(l);
     return expected !== null && l.amountINR !== undefined && differs(expected, l.amountINR) ? sum + (l.amountINR - expected) : sum;
   }, 0);
-  if (overcharge === 0) return null;
-  if (q.gst.status !== "extra") return t.trueTotalINR - overcharge;
+  const gstGap = gstRateGap(q, t);
+  if (overcharge === 0 && !gstGap) return null;
+  if (q.gst.status !== "extra") return t.trueTotalINR - overcharge - (gstGap ? gstGap.stated - gstGap.expected : 0);
   const fixedBase = t.baseINR - overcharge;
+  // A wrong GST amount is recalculated from the rate; a right one is scaled to the corrected base.
   const gst =
-    q.gst.amountINR !== undefined
+    q.gst.amountINR !== undefined && !gstGap
       ? Math.round((q.gst.amountINR * fixedBase) / Math.max(1, t.baseINR))
       : Math.round((fixedBase * t.gstRatePct) / 100);
   return fixedBase + gst;
@@ -413,7 +450,7 @@ function correctedTotal(q: Quote, t: Totals): number | null {
  */
 export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
   const t = computeTotals(q, ctx);
-  const findings: Finding[] = [...checkLineMath(q), ...checkSubtotal(q, t), ...checkGst(q, t)];
+  const findings: Finding[] = [...checkLineMath(q), ...checkSubtotal(q, t), ...checkGst(q, t), ...checkGstRate(q, t)];
   findings.push(
     ...checkWrittenTotal(q, t, findings),
     ...checkGuests(q, ctx),
