@@ -56,7 +56,7 @@ We also tried Gemini's Google Search grounding for live market prices. Productio
 
 ```bash
 npm install
-npm test          # 341 unit and API tests
+npm test          # 351 unit and API tests
 npm run test:coverage  # coverage: 98% of lines, 88% of branches; CI fails below 95% / 85%
 npm run typecheck
 npm run lint      # Biome: lint + format check (TypeScript, browser JS, CSS)
@@ -92,7 +92,9 @@ src/engine/        Deterministic planner: budget, timeline, vendors, deals, quot
 src/interview/     Local Hinglish parser + interview flow (AI only for gaps)
 src/ai/            Gemini client (injectable), ideas, quote reader
 src/places/        Google Places client with result validation
-src/app.ts         Express 5 routes, security middleware, rate limits
+src/routes/        One Express router per feature, dependencies injected
+src/http/          Security headers, rate limits (one table), error handlers
+src/app.ts         Composition: middleware order, static files, routers
 ```
 
 ## Run locally

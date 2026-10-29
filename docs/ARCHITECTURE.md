@@ -32,7 +32,9 @@ There is no database and no login. The plan lives in the browser (`localStorage`
 | `interview/` | Local parser for English/Hinglish (dates, guests, lakh/crore, cities, diet), the question flow, validation of every field | Only for gaps |
 | `ai/` | One injectable `AiClient` for Gemini (structured JSON output), the quote reader, ideas. Every reply is re-validated with zod | Yes |
 | `places/` | Google Places client; query built by code from a fixed term and a validated city; results filtered | No (Google Maps) |
-| `app.ts` | Routes, security middleware, rate limits, static files | |
+| `routes/` | One small Express router per feature (interview, plan and calendar, quote, ideas, vendors), each given its dependencies (AI, Places, today's date, limits) so tests can fake them | |
+| `http/` | Security headers and override-header stripping, one rate-limit helper with every limit in one table, the 404 and generic error handlers | |
+| `app.ts` | Composition only: middleware order, static files, `/health`, then the routers | |
 
 ## Browser (`public/js/`)
 
@@ -61,4 +63,4 @@ One module per job, none over 300 lines, type-checked with `checkJs`. All text i
 
 ## Quality gates (CI on every push)
 
-`npm audit` (production) · TypeScript strict (server) and `checkJs` (browser) · Biome lint and format, cognitive complexity ≤ 20 per function · 341 unit and API tests with coverage ≥ 95% lines · build · 30 Playwright browser tests on phone and desktop, including an axe WCAG 2.2 AA scan of 13 screens and states.
+`npm audit` (production) · TypeScript strict (server) and `checkJs` (browser) · Biome lint and format, cognitive complexity ≤ 20 per function · 351 unit and API tests with coverage ≥ 95% lines · build · 30 Playwright browser tests on phone and desktop, including an axe WCAG 2.2 AA scan of 13 screens and states.
