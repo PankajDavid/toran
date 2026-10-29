@@ -130,140 +130,178 @@ function lineAmount(l: QuoteLine): number | null {
   return null;
 }
 
-export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
-  const findings: Finding[] = [];
-  const add = (f: Finding) => findings.push(f);
+/** Money worked out once and shared by the checks. */
+interface Totals {
+  linesTotalINR: number;
+  unpriced: number;
+  baseINR: number;
+  gstRatePct: number;
+  gstINR: number;
+  trueTotalINR: number;
+  ifGstExtraINR: number | null;
+}
 
-  // 1. Arithmetic on each line: quantity × rate must equal the amount (±₹1 for rounding).
-  q.lines.forEach((l, i) => {
-    if (l.quantity === undefined || l.rate === undefined || l.amountINR === undefined) return;
-    const expected = Math.round(l.quantity * l.rate);
-    if (Math.abs(expected - l.amountINR) > 1) {
-      add({
-        code: "LINE_MATH",
-        severity: "problem",
-        message: `Line ${i + 1} (${l.description}): ${num(l.quantity)} × ${inr(l.rate)} = ${inr(expected)}, but the quote says ${inr(l.amountINR)}. Difference ${inr(Math.abs(l.amountINR - expected))}.`,
-        question: `For "${l.description}", ${num(l.quantity)} × ${num(l.rate)} comes to ${inr(expected)}, but the quote shows ${inr(l.amountINR)}. Could you please check this line?`,
-      });
-    }
-  });
+/** A line's quantity × rate when all three numbers are written, else null. */
+function expectedAmount(l: QuoteLine): number | null {
+  return l.quantity === undefined || l.rate === undefined || l.amountINR === undefined ? null : Math.round(l.quantity * l.rate);
+}
 
-  // 2. Subtotal: the lines must add up to the subtotal written on the quote.
+const differs = (a: number, b: number) => Math.abs(a - b) > 1; // ±₹1 for rounding
+const list = (xs: string[]) => (xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+/** Line descriptions and written terms: where items, extras and conditions show up. */
+const termsOf = (q: Quote) => [...(q.notes ?? []), ...q.lines.map((l) => l.description)];
+
+function computeTotals(q: Quote, ctx: QuoteContext): Totals {
   const known = q.lines.map(lineAmount);
   const linesTotalINR = known.reduce<number>((a, b) => a + (b ?? 0), 0);
   const unpriced = known.filter((a) => a === null).length;
-  if (unpriced) {
-    add({
+  const baseINR = q.subtotalINR ?? linesTotalINR;
+  const gstRatePct = q.gst.ratePct ?? ctx.assumedGstPct ?? 18;
+  if (q.gst.status === "extra") {
+    const gstINR = q.gst.amountINR ?? Math.round((baseINR * gstRatePct) / 100);
+    return { linesTotalINR, unpriced, baseINR, gstRatePct, gstINR, trueTotalINR: baseINR + gstINR, ifGstExtraINR: null };
+  }
+  const trueTotalINR = q.totalINR ?? baseINR;
+  const ifGstExtraINR = q.gst.status === "included" ? null : trueTotalINR + Math.round((trueTotalINR * gstRatePct) / 100);
+  return { linesTotalINR, unpriced, baseINR, gstRatePct, gstINR: 0, trueTotalINR, ifGstExtraINR };
+}
+
+/** 1. Each line: quantity × rate must equal the amount. */
+function checkLineMath(q: Quote): Finding[] {
+  return q.lines.flatMap((l, i) => {
+    const expected = expectedAmount(l);
+    if (expected === null || l.amountINR === undefined || !differs(expected, l.amountINR)) return [];
+    return [
+      {
+        code: "LINE_MATH",
+        severity: "problem" as const,
+        message: `Line ${i + 1} (${l.description}): ${num(l.quantity ?? 0)} × ${inr(l.rate ?? 0)} = ${inr(expected)}, but the quote says ${inr(l.amountINR)}. Difference ${inr(Math.abs(l.amountINR - expected))}.`,
+        question: `For "${l.description}", ${num(l.quantity ?? 0)} × ${num(l.rate ?? 0)} comes to ${inr(expected)}, but the quote shows ${inr(l.amountINR)}. Could you please check this line?`,
+      },
+    ];
+  });
+}
+
+/** 2. Unpriced lines, and the lines against the written subtotal. */
+function checkSubtotal(q: Quote, t: Totals): Finding[] {
+  const out: Finding[] = [];
+  if (t.unpriced) {
+    out.push({
       code: "UNPRICED_LINES",
       severity: "warning",
-      message: `${unpriced} line${unpriced === 1 ? " has" : "s have"} no amount, so the total can't be fully checked.`,
+      message: `${t.unpriced} line${t.unpriced === 1 ? " has" : "s have"} no amount, so the total can't be fully checked.`,
       question: "A few items on the quotation don't have a price. Could you share the amount for each?",
     });
   }
-  if (q.subtotalINR !== undefined && !unpriced && Math.abs(q.subtotalINR - linesTotalINR) > 1) {
-    add({
+  if (q.subtotalINR !== undefined && !t.unpriced && differs(q.subtotalINR, t.linesTotalINR)) {
+    out.push({
       code: "SUBTOTAL_MISMATCH",
       severity: "problem",
-      message: `The lines add up to ${inr(linesTotalINR)}, but the subtotal says ${inr(q.subtotalINR)}. Difference ${inr(Math.abs(q.subtotalINR - linesTotalINR))}.`,
-      question: `The items on the quotation add up to ${inr(linesTotalINR)}, but the subtotal is ${inr(q.subtotalINR)}. Could you please check?`,
+      message: `The lines add up to ${inr(t.linesTotalINR)}, but the subtotal says ${inr(q.subtotalINR)}. Difference ${inr(Math.abs(q.subtotalINR - t.linesTotalINR))}.`,
+      question: `The items on the quotation add up to ${inr(t.linesTotalINR)}, but the subtotal is ${inr(q.subtotalINR)}. Could you please check?`,
     });
   }
-  const baseINR = q.subtotalINR ?? linesTotalINR;
+  return out;
+}
 
-  // 3. GST.
-  const gstRatePct = q.gst.ratePct ?? ctx.assumedGstPct ?? 18;
-  let gstINR = 0;
-  let trueTotalINR: number;
-  let ifGstExtraINR: number | null = null;
+/** 3. GST: extra (what it adds), included, or not mentioned (what it would add); and subtotal + GST = total. */
+function checkGst(q: Quote, t: Totals): Finding[] {
+  if (q.gst.status === "not-mentioned") {
+    return [
+      {
+        code: "GST_NOT_MENTIONED",
+        severity: "warning",
+        message: `GST isn't mentioned. If it's added on top at ${num(t.gstRatePct)}%, you'd pay ${inr(t.ifGstExtraINR ?? 0)} instead of ${inr(t.trueTotalINR)}.`,
+        question: "Is GST included in this price, or will it be added on top?",
+      },
+    ];
+  }
+  const out: Finding[] = [];
+  const mismatch = (sub: number, gst: number, total: number): Finding => ({
+    code: "TOTAL_MISMATCH",
+    severity: "problem",
+    message: `Subtotal ${inr(sub)} + GST ${inr(gst)} = ${inr(sub + gst)}, but the total says ${inr(total)}.`,
+    question: `Subtotal plus GST comes to ${inr(sub + gst)}, but the total shows ${inr(total)}. Could you confirm the final amount?`,
+  });
   if (q.gst.status === "extra") {
-    gstINR = q.gst.amountINR ?? Math.round((baseINR * gstRatePct) / 100);
-    const computed = baseINR + gstINR;
-    trueTotalINR = computed;
-    add({
+    out.push({
       code: "GST_EXTRA",
       severity: "warning",
-      message: `GST is extra. At ${num(gstRatePct)}%${q.gst.ratePct === undefined ? " (assumed)" : ""}, that's ${inr(gstINR)} more: you'd pay ${inr(computed)}, not ${inr(baseINR)}.`,
+      message: `GST is extra. At ${num(t.gstRatePct)}%${q.gst.ratePct === undefined ? " (assumed)" : ""}, that's ${inr(t.gstINR)} more: you'd pay ${inr(t.trueTotalINR)}, not ${inr(t.baseINR)}.`,
       question:
         q.gst.ratePct === undefined ? "GST is mentioned as extra. Which GST rate applies, and will you give a GST invoice?" : undefined,
     });
-    if (q.totalINR !== undefined && Math.abs(q.totalINR - computed) > 1 && q.gst.amountINR !== undefined) {
-      add({
-        code: "TOTAL_MISMATCH",
-        severity: "problem",
-        message: `Subtotal ${inr(baseINR)} + GST ${inr(gstINR)} = ${inr(computed)}, but the total says ${inr(q.totalINR)}.`,
-        question: `Subtotal plus GST comes to ${inr(computed)}, but the total shows ${inr(q.totalINR)}. Could you confirm the final amount?`,
-      });
+    if (q.totalINR !== undefined && q.gst.amountINR !== undefined && differs(q.totalINR, t.trueTotalINR)) {
+      out.push(mismatch(t.baseINR, t.gstINR, q.totalINR));
     }
-  } else if (q.gst.status === "included") {
-    trueTotalINR = q.totalINR ?? baseINR;
-    add({ code: "GST_INCLUDED", severity: "good", message: "GST is included in the price." });
-    if (q.totalINR !== undefined && q.subtotalINR !== undefined && q.gst.amountINR !== undefined) {
-      const computed = q.subtotalINR + q.gst.amountINR;
-      if (Math.abs(computed - q.totalINR) > 1) {
-        add({
-          code: "TOTAL_MISMATCH",
-          severity: "problem",
-          message: `Subtotal ${inr(q.subtotalINR)} + GST ${inr(q.gst.amountINR)} = ${inr(computed)}, but the total says ${inr(q.totalINR)}.`,
-          question: `The subtotal and GST add up to ${inr(computed)}, but the total shows ${inr(q.totalINR)}. Could you confirm the final amount?`,
-        });
-      }
-    }
-  } else {
-    trueTotalINR = q.totalINR ?? baseINR;
-    ifGstExtraINR = trueTotalINR + Math.round((trueTotalINR * gstRatePct) / 100);
-    add({
-      code: "GST_NOT_MENTIONED",
-      severity: "warning",
-      message: `GST isn't mentioned. If it's added on top at ${num(gstRatePct)}%, you'd pay ${inr(ifGstExtraINR)} instead of ${inr(trueTotalINR)}.`,
-      question: "Is GST included in this price, or will it be added on top?",
-    });
+    return out;
   }
-
-  // 3b. No subtotal written: the written total must match the lines (or lines + GST when GST is extra).
-  if (q.subtotalINR === undefined && q.totalINR !== undefined && !unpriced && !findings.some((f) => f.code === "TOTAL_MISMATCH")) {
-    const fits = [linesTotalINR, ...(q.gst.status === "extra" ? [linesTotalINR + gstINR] : [])].some(
-      (x) => Math.abs(x - (q.totalINR ?? 0)) <= 1,
-    );
-    if (!fits) {
-      const diff = Math.abs(linesTotalINR - q.totalINR);
-      add({
-        code: "TOTAL_MISMATCH",
-        severity: "problem",
-        message: `The items add up to ${inr(linesTotalINR)}, but the total says ${inr(q.totalINR)}. Difference ${inr(diff)}.${q.totalINR < linesTotalINR ? " If that's a package discount, get it in writing." : ""}`,
-        question: `The items add up to ${inr(linesTotalINR)}, but the total shows ${inr(q.totalINR)}. Which is the final amount${q.totalINR < linesTotalINR ? ", and is the difference a discount" : ""}?`,
-      });
-    }
+  out.push({ code: "GST_INCLUDED", severity: "good", message: "GST is included in the price." });
+  if (
+    q.totalINR !== undefined &&
+    q.subtotalINR !== undefined &&
+    q.gst.amountINR !== undefined &&
+    differs(q.subtotalINR + q.gst.amountINR, q.totalINR)
+  ) {
+    out.push(mismatch(q.subtotalINR, q.gst.amountINR, q.totalINR));
   }
+  return out;
+}
 
-  // 4. Minimum guarantee vs guest count.
-  const perGuest = q.lines.find(
-    (l) => l.rate !== undefined && ((l.unit && PER_GUEST_UNIT.test(l.unit)) || PER_GUEST_UNIT.test(l.description)),
-  );
-  if (q.minimumGuarantee && q.minimumGuarantee.quantity > ctx.guestCount) {
-    const extra = q.minimumGuarantee.quantity - ctx.guestCount;
+/** 3b. No subtotal written: the written total must match the items (or items + GST when GST is extra). */
+function checkWrittenTotal(q: Quote, t: Totals, already: readonly Finding[]): Finding[] {
+  if (q.subtotalINR !== undefined || q.totalINR === undefined || t.unpriced || already.some((f) => f.code === "TOTAL_MISMATCH")) return [];
+  const total = q.totalINR;
+  const allowed = [t.linesTotalINR, ...(q.gst.status === "extra" ? [t.linesTotalINR + t.gstINR] : [])];
+  if (allowed.some((x) => !differs(x, total))) return [];
+  const discount = total < t.linesTotalINR;
+  return [
+    {
+      code: "TOTAL_MISMATCH",
+      severity: "problem",
+      message: `The items add up to ${inr(t.linesTotalINR)}, but the total says ${inr(total)}. Difference ${inr(Math.abs(t.linesTotalINR - total))}.${discount ? " If that's a package discount, get it in writing." : ""}`,
+      question: `The items add up to ${inr(t.linesTotalINR)}, but the total shows ${inr(total)}. Which is the final amount${discount ? ", and is the difference a discount" : ""}?`,
+    },
+  ];
+}
+
+/** The per-plate (or per-head) line, if there is one. */
+const perGuestLine = (q: Quote) =>
+  q.lines.find((l) => l.rate !== undefined && ((l.unit && PER_GUEST_UNIT.test(l.unit)) || PER_GUEST_UNIT.test(l.description)));
+
+/** 4–5. A minimum guarantee above the guest count (priced), and a per-guest line quoted for too few. */
+function checkGuests(q: Quote, ctx: QuoteContext): Finding[] {
+  const out: Finding[] = [];
+  const perGuest = perGuestLine(q);
+  const min = q.minimumGuarantee;
+  if (min && min.quantity > ctx.guestCount) {
+    const extra = min.quantity - ctx.guestCount;
     const cost = perGuest?.rate !== undefined ? Math.round(extra * perGuest.rate) : null;
-    add({
+    out.push({
       code: "MIN_GUARANTEE",
       severity: "warning",
-      message: `The quote has a minimum of ${num(q.minimumGuarantee.quantity)} ${q.minimumGuarantee.unit ?? "plates"}, but you expect ${num(ctx.guestCount)} guests. You'd pay for ${num(extra)} that nobody eats${cost !== null ? `: about ${inr(cost)}` : ""}.`,
-      question: `We expect about ${num(ctx.guestCount)} guests. Could the minimum guarantee be ${num(ctx.guestCount)} instead of ${num(q.minimumGuarantee.quantity)}?`,
+      message: `The quote has a minimum of ${num(min.quantity)} ${min.unit ?? "plates"}, but you expect ${num(ctx.guestCount)} guests. You'd pay for ${num(extra)} that nobody eats${cost !== null ? `: about ${inr(cost)}` : ""}.`,
+      question: `We expect about ${num(ctx.guestCount)} guests. Could the minimum guarantee be ${num(ctx.guestCount)} instead of ${num(min.quantity)}?`,
     });
   }
-  // 5. Per-guest line quoted for fewer guests than expected.
-  if (perGuest && perGuest.quantity !== undefined && perGuest.quantity < ctx.guestCount && perGuest.rate !== undefined) {
-    const short = ctx.guestCount - perGuest.quantity;
-    add({
+  if (perGuest?.quantity !== undefined && perGuest.rate !== undefined && perGuest.quantity < ctx.guestCount) {
+    out.push({
       code: "SHORT_QUANTITY",
       severity: "warning",
-      message: `"${perGuest.description}" is quoted for ${num(perGuest.quantity)}, but you expect ${num(ctx.guestCount)} guests. Feeding everyone adds about ${inr(short * perGuest.rate)}.`,
+      message: `"${perGuest.description}" is quoted for ${num(perGuest.quantity)}, but you expect ${num(ctx.guestCount)} guests. Feeding everyone adds about ${inr((ctx.guestCount - perGuest.quantity) * perGuest.rate)}.`,
       question: `Please quote "${perGuest.description}" for ${num(ctx.guestCount)} guests.`,
     });
   }
+  return out;
+}
 
-  // 6. Items usually expected: covered, excluded ("to be arranged by party"), or not mentioned at all.
+/** Wording that marks an item as the family's job, or charged on top. */
+const EXCLUDED =
+  /arranged\s+by\s+(the\s+)?(party|client|customer|host|you)|by\s+(the\s+)?(party|client|customer)|not\s+included|excluded|exclusive\s+of|excluding|\bextra\b|chargeable|charged\s+separately|own\s+arrangement/i;
+
+/** 6. Items families assume are included: covered, explicitly excluded, or not mentioned at all. */
+function checkExpectedItems(q: Quote): Finding[] {
   const segments = [...q.lines.map((l) => l.description), ...(q.notes ?? [])];
-  const EXCLUDED =
-    /arranged\s+by\s+(the\s+)?(party|client|customer|host|you)|by\s+(the\s+)?(party|client|customer)|not\s+included|excluded|exclusive\s+of|excluding|\bextra\b|chargeable|charged\s+separately|own\s+arrangement/i;
   const missing: string[] = [];
   const excluded: string[] = [];
   for (const e of EXPECTED[q.category] ?? []) {
@@ -271,28 +309,33 @@ export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
     if (!hits.length) missing.push(e.item);
     else if (hits.every((seg) => EXCLUDED.test(seg))) excluded.push(e.item);
   }
-  const list = (xs: string[]) => (xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+  const out: Finding[] = [];
   if (excluded.length) {
-    add({
+    const one = excluded.length === 1;
+    out.push({
       code: "EXCLUDED_ITEMS",
       severity: "warning",
-      message: `Not included, you arrange and pay: ${excluded.join(", ")}. Budget for ${excluded.length === 1 ? "it" : "them"} separately.`,
-      question: `The quote says ${list(excluded)} ${excluded.length === 1 ? "is" : "are"} to be arranged by us. Could you quote for ${excluded.length === 1 ? "it" : "them"} too?`,
+      message: `Not included, you arrange and pay: ${excluded.join(", ")}. Budget for ${one ? "it" : "them"} separately.`,
+      question: `The quote says ${list(excluded)} ${one ? "is" : "are"} to be arranged by us. Could you quote for ${one ? "it" : "them"} too?`,
     });
   }
   if (missing.length) {
-    add({
+    out.push({
       code: "MISSING_ITEMS",
       severity: "warning",
       message: `Not mentioned: ${missing.join(", ")}. These often cost extra if they're not in writing.`,
       question: `${missing.length === 1 ? "Is" : "Are"} ${list(missing)} included in this price?`,
     });
   }
+  return out;
+}
 
-  // 6b. Costs that sit outside the total: "diesel extra", "travel extra", "subject to seasonal rates",
-  // "extra hours at 15,000 per hour". GST has its own check, and "arranged by party" items are above.
-  const EXTRA_COST =
-    /\bextra\b|chargeable|charged\s+(separately|extra|at|@)|additional(ly)?\s+(charge|cost)|subject\s+to|as\s+(per\s+)?actuals?|at\s+actuals?|per\s+(hour|hr)\b|escalat/i;
+/** Wording that puts a cost outside the total ("diesel extra", "subject to seasonal rates", "per hour"). */
+const EXTRA_COST =
+  /\bextra\b|chargeable|charged\s+(separately|extra|at|@)|additional(ly)?\s+(charge|cost)|subject\s+to|as\s+(per\s+)?actuals?|at\s+actuals?|per\s+(hour|hr)\b|escalat/i;
+
+/** 6b. Costs outside the total. GST has its own check, and "arranged by party" items are above. */
+function checkExtraCharges(q: Quote, t: Totals): Finding[] {
   const unpricedLines = q.lines.filter((l) => lineAmount(l) === null).map((l) => l.description);
   const extras = [...(q.notes ?? []), ...unpricedLines]
     .filter((seg) => EXTRA_COST.test(seg) && !/\b(gst|tax|taxes)\b/i.test(seg) && !/arranged\s+by/i.test(seg))
@@ -304,72 +347,83 @@ export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
     )
     .filter((seg, i, all) => seg && all.indexOf(seg) === i)
     .slice(0, 5);
-  if (extras.length) {
-    add({
+  if (!extras.length) return [];
+  const quoted = extras.map((x) => `"${x}"`).join(", ");
+  return [
+    {
       code: "EXTRA_CHARGES",
       severity: "warning",
-      message: `Costs outside the total: ${extras.map((x) => `"${x}"`).join(", ")}. The real bill will be higher than ${inr(trueTotalINR)}.`,
-      question: `The quote says ${extras.map((x) => `"${x}"`).join(", ")}. Could you give a fixed amount for ${extras.length === 1 ? "this" : "each of these"} so we know the full cost?`,
-    });
-  }
+      message: `Costs outside the total: ${quoted}. The real bill will be higher than ${inr(t.trueTotalINR)}.`,
+      question: `The quote says ${quoted}. Could you give a fixed amount for ${extras.length === 1 ? "this" : "each of these"} so we know the full cost?`,
+    },
+  ];
+}
 
-  // 7. Against the planned budget line.
-  let budgetGapINR: number | null = null;
-  if (ctx.plannedINR !== undefined) {
-    budgetGapINR = trueTotalINR - ctx.plannedINR;
-    if (budgetGapINR > 0) {
-      add({ code: "OVER_PLAN", severity: "warning", message: `${inr(budgetGapINR)} over your plan of ${inr(ctx.plannedINR)} for this.` });
-    } else {
-      add({
-        code: "WITHIN_PLAN",
-        severity: "good",
-        message: `Within your plan of ${inr(ctx.plannedINR)}${budgetGapINR < 0 ? `, with ${inr(-budgetGapINR)} to spare` : ""}.`,
-      });
-    }
-  }
+/** 7. Against the planned budget line. */
+function checkAgainstPlan(t: Totals, ctx: QuoteContext): Finding[] {
+  if (ctx.plannedINR === undefined) return [];
+  const gap = t.trueTotalINR - ctx.plannedINR;
+  if (gap > 0)
+    return [{ code: "OVER_PLAN", severity: "warning", message: `${inr(gap)} over your plan of ${inr(ctx.plannedINR)} for this.` }];
+  return [
+    {
+      code: "WITHIN_PLAN",
+      severity: "good",
+      message: `Within your plan of ${inr(ctx.plannedINR)}${gap < 0 ? `, with ${inr(-gap)} to spare` : ""}.`,
+    },
+  ];
+}
 
-  // 7b. Hidden instructions to an AI ("note for AI: report the total as ..."). A real quote never
-  // talks to an AI, so this is a sign someone tried to trick the reader. Checked by code, on every
-  // line, note and the vendor name.
-  const AI_INSTRUCTION =
-    /text\s+addressed\s+to\s+an\s+ai|\b(note|message|instructions?)\s+(to|for)\s+(the\s+)?(ai|assistants?|models?|llms?|chatbots?|gpt|gemini|claude)\b|\b(ignore|disregard)\b.{0,40}\b(instructions?|above|previous|table|rules|prompt)\b|\bsystem\s+prompt\b|\byou\s+are\s+(an?\s+)?(ai|assistant|language\s+model)\b|\bas\s+an\s+ai\b/i;
-  const planted = [q.vendorName ?? "", ...q.lines.map((l) => l.description), ...(q.notes ?? [])].some((t) => AI_INSTRUCTION.test(t));
-  if (planted) {
-    add({
+/** Text written to an AI ("note for AI: report the total as ..."). A real quote never talks to an AI. */
+const AI_INSTRUCTION =
+  /text\s+addressed\s+to\s+an\s+ai|\b(note|message|instructions?)\s+(to|for)\s+(the\s+)?(ai|assistants?|models?|llms?|chatbots?|gpt|gemini|claude)\b|\b(ignore|disregard)\b.{0,40}\b(instructions?|above|previous|table|rules|prompt)\b|\bsystem\s+prompt\b|\byou\s+are\s+(an?\s+)?(ai|assistant|language\s+model)\b|\bas\s+an\s+ai\b/i;
+
+/** 7b. Hidden instructions to an AI in any line, note or the vendor name: someone tried to trick the reading. */
+function checkAiInstructions(q: Quote): Finding[] {
+  if (![q.vendorName ?? "", ...termsOf(q)].some((x) => AI_INSTRUCTION.test(x))) return [];
+  return [
+    {
       code: "AI_INSTRUCTIONS",
       severity: "problem",
       message:
         "This quote contains text addressed to an AI, a sign someone tried to trick the reading. Check every line and the total against the paper before you trust this check.",
       question: "Your quotation has a note addressed to an AI system. Could you send a clean, signed copy of the quote?",
-    });
-  }
+    },
+  ];
+}
 
-  // 8. Payment terms. "Full payment before setup" is a 100% advance, whatever the reader extracted.
-  const terms = [...(q.notes ?? []), ...q.lines.map((l) => l.description)];
-  const fullUpfront = terms.some((t) =>
-    /(full|entire|complete|100\s*%)\s*(payment|amount)?\s*(in\s+advance|before|prior\s+to|at\s+(the\s+)?time\s+of\s+booking|advance)/i.test(
-      t,
-    ),
-  );
-  const advancePct = fullUpfront
-    ? 100
-    : (q.advance?.percent ??
-      (q.advance?.amountINR !== undefined && trueTotalINR > 0 ? Math.round((q.advance.amountINR / trueTotalINR) * 100) : undefined));
-  if (advancePct !== undefined && advancePct > 50) {
-    add({
+const FULL_UPFRONT =
+  /(full|entire|complete|100\s*%)\s*(payment|amount)?\s*(in\s+advance|before|prior\s+to|at\s+(the\s+)?time\s+of\s+booking|advance)/i;
+const NON_REFUNDABLE = /non[\s-]?refundable|not\s+refundable|no\s+refunds?|will\s+not\s+be\s+refunded/i;
+/** Advance above this share of the total is a warning; at or above PROBLEM_ADVANCE_PCT, a problem. */
+const HIGH_ADVANCE_PCT = 50;
+const PROBLEM_ADVANCE_PCT = 90;
+
+/** The advance as a share of the total. "Full payment before setup" counts as 100%, whatever was extracted. */
+function advancePercent(q: Quote, t: Totals): number | undefined {
+  if (termsOf(q).some((x) => FULL_UPFRONT.test(x))) return 100;
+  if (q.advance?.percent !== undefined) return q.advance.percent;
+  if (q.advance?.amountINR !== undefined && t.trueTotalINR > 0) return Math.round((q.advance.amountINR / t.trueTotalINR) * 100);
+  return undefined;
+}
+
+/** 8. Payment terms: a high advance, a non-refundable advance, or no refund terms at all. */
+function checkPayment(q: Quote, t: Totals): Finding[] {
+  const out: Finding[] = [];
+  const pct = advancePercent(q, t);
+  if (pct !== undefined && pct > HIGH_ADVANCE_PCT) {
+    const severe = pct >= PROBLEM_ADVANCE_PCT; // paying everything before the work is the riskiest term on any quote
+    out.push({
       code: "HIGH_ADVANCE",
-      // Paying everything before the work is done is the riskiest term on any quote.
-      severity: advancePct >= 90 ? "problem" : "warning",
-      message:
-        advancePct >= 90
-          ? `It asks for ${num(advancePct)}% before the event. If anything goes wrong, you have no money left to hold back.`
-          : `The advance is ${num(advancePct)}%. Paying more than half before the event leaves you little leverage.`,
-      question: `Could the advance be lowered to 25–30%, with the rest paid after the event?`,
+      severity: severe ? "problem" : "warning",
+      message: severe
+        ? `It asks for ${num(pct)}% before the event. If anything goes wrong, you have no money left to hold back.`
+        : `The advance is ${num(pct)}%. Paying more than half before the event leaves you little leverage.`,
+      question: "Could the advance be lowered to 25–30%, with the rest paid after the event?",
     });
   }
-  const nonRefundable = terms.some((t) => /non[\s-]?refundable|not\s+refundable|no\s+refunds?|will\s+not\s+be\s+refunded/i.test(t));
-  if (nonRefundable) {
-    add({
+  if (termsOf(q).some((x) => NON_REFUNDABLE.test(x))) {
+    out.push({
       code: "NON_REFUNDABLE",
       severity: "problem",
       message: "The advance is non-refundable. If plans change, you lose it all.",
@@ -377,45 +431,60 @@ export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
         "If we have to cancel or change the date, could the advance be adjusted against a new date, or refunded after deducting your actual costs?",
     });
   } else if (!q.refundMentioned) {
-    add({
+    out.push({
       code: "NO_REFUND_TERMS",
       severity: "warning",
       message: "There's no cancellation or refund policy on the quote.",
       question: "Could you share your cancellation and refund policy in writing?",
     });
   }
+  return out;
+}
 
-  // If any line's maths is wrong, what would the vendor's total be with correct maths?
-  let correctedTotalINR: number | null = null;
+/** If any line's maths is wrong: what the total would be with the maths corrected (GST scaled to match). */
+function correctedTotal(q: Quote, t: Totals): number | null {
   const overcharge = q.lines.reduce((sum, l) => {
-    if (l.quantity === undefined || l.rate === undefined || l.amountINR === undefined) return sum;
-    const expected = Math.round(l.quantity * l.rate);
-    return Math.abs(expected - l.amountINR) > 1 ? sum + (l.amountINR - expected) : sum;
+    const expected = expectedAmount(l);
+    return expected !== null && l.amountINR !== undefined && differs(expected, l.amountINR) ? sum + (l.amountINR - expected) : sum;
   }, 0);
-  if (overcharge !== 0) {
-    const fixedBase = baseINR - overcharge;
-    correctedTotalINR =
-      q.gst.status === "extra"
-        ? fixedBase +
-          (q.gst.amountINR !== undefined
-            ? Math.round((q.gst.amountINR * fixedBase) / Math.max(1, baseINR))
-            : Math.round((fixedBase * gstRatePct) / 100))
-        : trueTotalINR - overcharge;
-  }
+  if (overcharge === 0) return null;
+  if (q.gst.status !== "extra") return t.trueTotalINR - overcharge;
+  const fixedBase = t.baseINR - overcharge;
+  const gst =
+    q.gst.amountINR !== undefined
+      ? Math.round((q.gst.amountINR * fixedBase) / Math.max(1, t.baseINR))
+      : Math.round((fixedBase * t.gstRatePct) / 100);
+  return fixedBase + gst;
+}
 
-  const questions = findings.map((f) => f.question).filter((x): x is string => !!x);
+/**
+ * Runs every check on a quote the user has confirmed. Plain code, no AI: each check is a small
+ * function, and findings come back in a fixed order with the polite questions to send the vendor.
+ */
+export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
+  const t = computeTotals(q, ctx);
+  const findings: Finding[] = [...checkLineMath(q), ...checkSubtotal(q, t), ...checkGst(q, t)];
+  findings.push(
+    ...checkWrittenTotal(q, t, findings),
+    ...checkGuests(q, ctx),
+    ...checkExpectedItems(q),
+    ...checkExtraCharges(q, t),
+    ...checkAgainstPlan(t, ctx),
+    ...checkAiInstructions(q),
+    ...checkPayment(q, t),
+  );
   return {
-    linesTotalINR,
-    baseINR,
+    linesTotalINR: t.linesTotalINR,
+    baseINR: t.baseINR,
     gstStatus: q.gst.status,
-    gstRatePct,
-    gstINR,
-    trueTotalINR,
-    ifGstExtraINR,
-    correctedTotalINR,
-    budgetGapINR,
+    gstRatePct: t.gstRatePct,
+    gstINR: t.gstINR,
+    trueTotalINR: t.trueTotalINR,
+    ifGstExtraINR: t.ifGstExtraINR,
+    correctedTotalINR: correctedTotal(q, t),
+    budgetGapINR: ctx.plannedINR === undefined ? null : t.trueTotalINR - ctx.plannedINR,
     findings,
-    questions,
+    questions: findings.map((f) => f.question).filter((x): x is string => !!x),
     problems: findings.filter((f) => f.severity === "problem").length,
     warnings: findings.filter((f) => f.severity === "warning").length,
   };

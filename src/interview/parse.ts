@@ -274,28 +274,21 @@ const CITY_NAMES = Object.keys(CITY_TIERS).sort((a, b) => b.length - a.length);
 
 const titleCase = (s: string) => s.replace(/\b\p{L}/gu, (c) => c.toUpperCase());
 
-export function parseLocal(text: string, today: string, context: { asking?: KnownField; known?: Known } = {}): LocalParse {
-  const t = text.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 500);
+type ParseContext = { asking?: KnownField; known?: Known };
+
+/** Event type and sub-type ("beti ki shaadi" → wedding), style and functions for weddings, kind of birthday. */
+function parseEvent(t: string, known: Known | undefined): Known {
   const fields: Known = {};
-  const guessed: KnownField[] = [];
-  if (!t) return { fields, guessed };
-
-  for (const rule of EVENT_RULES) {
-    if (rule.re.test(t)) {
-      fields.eventType = rule.eventType;
-      if (rule.subType) fields.subType = rule.subType;
-      break;
-    }
+  const rule = EVENT_RULES.find((r) => r.re.test(t));
+  if (rule) {
+    fields.eventType = rule.eventType;
+    if (rule.subType) fields.subType = rule.subType;
   }
-  const eventType = fields.eventType ?? context.known?.eventType;
-
+  const eventType = fields.eventType ?? known?.eventType;
   if (eventType === "wedding") {
-    for (const [re, style] of STYLE_RULES)
-      if (re.test(t)) {
-        fields.subType = style;
-        break;
-      }
-    const subs = SUB_EVENT_RULES.filter(([re]) => re.test(t)).map(([, s]) => s);
+    const style = STYLE_RULES.find(([re]) => re.test(t));
+    if (style) fields.subType = style[1];
+    const subs = SUB_EVENT_RULES.filter(([re]) => re.test(t)).map(([, sub]) => sub);
     if (subs.length) fields.subEvents = subs;
   }
   if (eventType === "birthday") {
@@ -303,61 +296,81 @@ export function parseLocal(text: string, today: string, context: { asking?: Know
     else if (/\b(beta|beti|son|daughter|bachch?[ae]|baby|kid|kids|bete)\b/.test(t)) fields.subType = "kid";
     else if (/\b(my|mera|meri|husband|wife|pati|patni|friend|dost)\b/.test(t)) fields.subType = "adult";
   }
+  return fields;
+}
 
-  const date = parseDate(t, today);
-  Object.assign(fields, date);
+/** A plain amount with no unit ("…20 log, 25000, Panchkula"): 4+ digits that isn't the guest count or a year. */
+function standaloneAmount(t: string, guestCount: number | undefined): number | undefined {
+  for (const m of t.matchAll(/(?:^|[\s,;])(\d{1,3}(?:,\d{2,3})+|\d{4,9})(?=$|[\s,;.])/g)) {
+    const raw = m[1].replace(/,/g, "");
+    const n = Number(raw);
+    const isYear = n >= 2020 && n <= 2035 && !m[1].includes(",");
+    if (raw === String(guestCount ?? "") || isYear) continue;
+    if (n >= 1000) return n;
+  }
+  return undefined;
+}
 
+/** Guests and budget, including bare numbers answering the question being asked. Guesses are marked. */
+function parseNumbers(t: string, asking: KnownField | undefined): { fields: Known; guessed: KnownField[] } {
+  const fields: Known = {};
+  const guessed: KnownField[] = [];
   const guests = parseGuests(t);
   if (guests !== undefined) fields.guestCount = guests;
-
   let budget = parseBudget(t);
-  // A bare number answering a direct question.
   const bare = t.match(/^(?:about|around|approx|lagbhag|~)?\s*(\d[\d,]*)\s*$/);
   if (bare) {
     const n = Number(bare[1].replace(/,/g, ""));
-    if (context.asking === "guestCount" && guests === undefined) fields.guestCount = n;
-    if (context.asking === "totalBudgetINR" && budget === undefined) {
-      if (n >= 1000) budget = n;
-      else if (n > 0 && n <= 500) {
-        budget = n * 1e5; // "15" while asking budget most likely means 15 lakh — flagged as a guess
-        guessed.push("totalBudgetINR");
-      }
+    if (asking === "guestCount" && guests === undefined) fields.guestCount = n;
+    if (asking === "totalBudgetINR" && budget === undefined && n >= 1000) budget = n;
+    else if (asking === "totalBudgetINR" && budget === undefined && n > 0 && n <= 500) {
+      budget = n * 1e5; // "15" while asking the budget most likely means 15 lakh: flagged as a guess
+      guessed.push("totalBudgetINR");
     }
-  }
-  // A plain amount with no unit ("…20 log, 25000, Panchkula"): a standalone number of
-  // 4+ digits that isn't the guest count or a year. Marked as a guess for confirmation.
-  if (budget === undefined && !bare) {
-    const used = new Set([String(fields.guestCount ?? "")]);
-    for (const m of t.matchAll(/(?:^|[\s,;])(\d{1,3}(?:,\d{2,3})+|\d{4,9})(?=$|[\s,;.])/g)) {
-      const raw = m[1].replace(/,/g, "");
-      const n = Number(raw);
-      if (used.has(raw) || (n >= 2020 && n <= 2035 && !m[1].includes(","))) continue;
-      if (n >= 1000) {
-        budget = n;
-        guessed.push("totalBudgetINR");
-        break;
-      }
-    }
+  } else if (budget === undefined) {
+    budget = standaloneAmount(t, fields.guestCount);
+    if (budget !== undefined) guessed.push("totalBudgetINR");
   }
   if (budget !== undefined) fields.totalBudgetINR = budget;
+  return { fields, guessed };
+}
 
+/** A known city (with its tier and, for weddings, a guessed style), or any name when we asked for the city. */
+function parseCity(text: string, t: string, eventType: Known["eventType"], ctx: ParseContext): { fields: Known; guessed: KnownField[] } {
   const city = CITY_NAMES.find((c) => new RegExp(`\\b${c}\\b`).test(t));
-  if (city) {
-    fields.city = titleCase(city);
-    fields.cityTier = CITY_TIERS[city];
-    if (eventType === "wedding" && !fields.subType && !context.known?.subType && CITY_STYLE[city]) {
-      fields.subType = CITY_STYLE[city];
-      guessed.push("subType");
-    }
-  } else if (context.asking === "city") {
-    const name = text.trim().match(/^[\p{L}\p{M} .'-]{2,60}$/u);
-    if (name) fields.city = titleCase(name[0].trim().toLowerCase());
+  if (!city) {
+    const name = ctx.asking === "city" ? text.trim().match(/^[\p{L}\p{M} .'-]{2,60}$/u) : null;
+    return { fields: name ? { city: titleCase(name[0].trim().toLowerCase()) } : {}, guessed: [] };
   }
+  const fields: Known = { city: titleCase(city), cityTier: CITY_TIERS[city] };
+  const guessStyle = eventType === "wedding" && !ctx.known?.subType && CITY_STYLE[city];
+  return guessStyle ? { fields: { ...fields, subType: CITY_STYLE[city] }, guessed: ["subType"] } : { fields, guessed: [] };
+}
 
-  if (/\bjain\b/.test(t)) fields.diet = "jain";
-  else if (/\b(veg (and|aur|&|\+) non[\s-]?veg|both veg)\b/.test(t)) fields.diet = "mixed";
-  else if (/\b(non[\s-]?veg|nonveg|chicken|mutton|fish)\b/.test(t)) fields.diet = "non-veg";
-  else if (/\b(pure veg|veg only|vegetarian|shakahari|veg)\b/.test(t)) fields.diet = "veg";
+function parseDiet(t: string): Known["diet"] | undefined {
+  if (/\bjain\b/.test(t)) return "jain";
+  if (/\b(veg (and|aur|&|\+) non[\s-]?veg|both veg)\b/.test(t)) return "mixed";
+  if (/\b(non[\s-]?veg|nonveg|chicken|mutton|fish)\b/.test(t)) return "non-veg";
+  if (/\b(pure veg|veg only|vegetarian|shakahari|veg)\b/.test(t)) return "veg";
+  return undefined;
+}
 
+/**
+ * Understands a free-form answer without AI: event, date, guests, budget, city and diet
+ * from English or Hinglish ("beti ki shaadi 14 feb, 250 log, 20 lakh, Ludhiana, pure veg").
+ * Anything inferred rather than stated is listed in `guessed` for the user to confirm.
+ */
+export function parseLocal(text: string, today: string, context: ParseContext = {}): LocalParse {
+  const t = text.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 500);
+  if (!t) return { fields: {}, guessed: [] };
+  const event = parseEvent(t, context.known);
+  const numbers = parseNumbers(t, context.asking);
+  const subTypeKnown = event.subType ? { ...context, known: { ...context.known, subType: event.subType } } : context;
+  const place = parseCity(text, t, event.eventType ?? context.known?.eventType, subTypeKnown);
+  const diet = parseDiet(t);
+  const fields: Known = { ...event, ...parseDate(t, today), ...numbers.fields, ...(diet ? { diet } : {}) };
+  // A city's style guess never overrides a style the user stated.
+  Object.assign(fields, place.fields.subType && fields.subType ? { ...place.fields, subType: fields.subType } : place.fields);
+  const guessed = [...numbers.guessed, ...(place.fields.subType && !event.subType ? place.guessed : [])];
   return { fields, guessed };
 }
