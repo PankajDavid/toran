@@ -75,7 +75,9 @@ export async function approve(s, button) {
     openVendorCats.add(a.vendor);
     showSection("vendors-card");
     renderVendors();
-    const d = [...document.querySelectorAll("details.vendor")].find((x) => x.open && x.querySelector(".v-cat"));
+    const d = [...document.querySelectorAll("details.vendor")].find(
+      (x) => /** @type {HTMLDetailsElement} */ (x).open && x.querySelector(".v-cat"),
+    );
     const target = document.getElementById(`vc-${a.vendor}`);
     if (target) {
       target.closest("details").scrollIntoView({ block: "start" });

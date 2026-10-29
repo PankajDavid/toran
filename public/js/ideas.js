@@ -2,7 +2,7 @@
  * Toran front end · Ideas, invitation wording and tips (one AI call fills all three).
  * Every piece of text is inserted with textContent (never innerHTML).
  */
-import { $, el } from "./dom.js";
+import { $, button, el, field } from "./dom.js";
 import { api, save, state } from "./store.js";
 import { renderNav } from "./nav.js";
 import { copyText, whatsappUrl } from "./share.js";
@@ -124,7 +124,7 @@ export const IDEA_BUTTONS = [
 export async function loadIdeas(refine) {
   // One AI call makes ideas, invitation and tips together; every button shows it working.
   for (const [id] of IDEA_BUTTONS) {
-    $(id).disabled = true;
+    button(id).disabled = true;
     $(id).textContent = "Working on it… (about 10 seconds)";
   }
   const box = $("ideas");
@@ -142,7 +142,7 @@ export async function loadIdeas(refine) {
     );
   } finally {
     for (const [id, label] of IDEA_BUTTONS) {
-      $(id).disabled = false;
+      button(id).disabled = false;
       $(id).textContent = label;
     }
     renderIdeas();
@@ -154,6 +154,6 @@ $("get-invitation").addEventListener("click", () => loadIdeas());
 $("get-tips").addEventListener("click", () => loadIdeas());
 $("refine").addEventListener("submit", (e) => {
   e.preventDefault();
-  const t = $("refine-text").value.trim();
+  const t = field("refine-text").value.trim();
   if (t) loadIdeas(t);
 });

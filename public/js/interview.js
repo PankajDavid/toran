@@ -2,7 +2,7 @@
  * Toran front end · The planning interview: chat, quick answers, voice input.
  * Every piece of text is inserted with textContent (never innerHTML).
  */
-import { $, el, show } from "./dom.js";
+import { $, button, el, field, show } from "./dom.js";
 import { describeField, FIELD_ORDER, fmtDate } from "./format.js";
 import { api, save, state } from "./store.js";
 import { buildPlan } from "./plan.js";
@@ -62,8 +62,8 @@ export function renderQuestion(q) {
   multi = new Set();
   const chips = $("chips");
   chips.replaceChildren();
-  const say = $("say");
-  const date = $("date");
+  const say = field("say");
+  const date = field("date");
   if (!q) return;
   say.placeholder = q.placeholder || "Type your answer";
   date.hidden = q.input !== "date";
@@ -160,7 +160,7 @@ export async function turn(payload, echo) {
 }
 
 export function setBusy(on) {
-  $("send").disabled = on;
+  button("send").disabled = on;
   for (const b of $("chips").querySelectorAll("button")) b.disabled = on;
 }
 
@@ -184,8 +184,8 @@ export function changeField(field) {
 
 $("composer").addEventListener("submit", (e) => {
   e.preventDefault();
-  const text = $("say").value.trim();
-  const date = $("date");
+  const text = field("say").value.trim();
+  const date = field("date");
   if (current && current.input === "date" && date.value) {
     const v = date.value;
     date.value = "";
@@ -193,12 +193,14 @@ $("composer").addEventListener("submit", (e) => {
     return;
   }
   if (!text) return;
-  $("say").value = "";
+  field("say").value = "";
   turn({ text }, text);
 });
 
 /* ---------- voice input (browser speech recognition) ---------- */
-export const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+// Speech recognition is still vendor-prefixed in Chrome and isn't in the standard DOM types.
+const speechWindow = /** @type {Window & { SpeechRecognition?: any; webkitSpeechRecognition?: any }} */ (window);
+export const Speech = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
 if (Speech) {
   const mic = $("mic");
   mic.hidden = false;
@@ -222,7 +224,7 @@ if (Speech) {
         if (ev.results[i].isFinal) finalText += t;
         else interim += t;
       }
-      $("say").value = (finalText + interim).slice(0, 500);
+      field("say").value = (finalText + interim).slice(0, 500);
     };
     rec.onerror = (ev) => {
       $("mic-status").textContent =
@@ -231,10 +233,10 @@ if (Speech) {
     rec.onend = () => {
       mic.setAttribute("aria-pressed", "false");
       rec = null;
-      const text = $("say").value.trim();
+      const text = field("say").value.trim();
       if (text) {
         $("mic-status").textContent = "";
-        $("say").value = "";
+        field("say").value = "";
         turn({ text }, text);
       } else if (!$("mic-status").textContent.startsWith("Microphone")) {
         $("mic-status").textContent = "";

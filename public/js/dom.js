@@ -3,8 +3,24 @@
  * Every piece of text is inserted with textContent (never innerHTML).
  */
 
+/** An element by id. @param {string} id @returns {HTMLElement} */
 export const $ = (id) => document.getElementById(id);
-/* ---------- tiny DOM helper ---------- */
+
+/** A form field by id (input, select or textarea). @param {string} id */
+export const field = (id) => /** @type {HTMLInputElement} */ (document.getElementById(id));
+
+/** A button by id. @param {string} id */
+export const button = (id) => /** @type {HTMLButtonElement} */ (document.getElementById(id));
+
+/**
+ * Builds an element. Text children become text nodes, so nothing is ever parsed as HTML.
+ * Attributes starting with "on" become event listeners; false, null and undefined are skipped.
+ * @template {keyof HTMLElementTagNameMap} K
+ * @param {K} tag
+ * @param {Record<string, any> | null} [attrs]
+ * @param {...any} children
+ * @returns {HTMLElementTagNameMap[K]}
+ */
 export function el(tag, attrs, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
@@ -20,7 +36,7 @@ export function el(tag, attrs, ...children) {
   return node;
 }
 
-/* ---------- screens ---------- */
+/** Shows one of the three screens. @param {"welcome" | "interview" | "plan"} screen */
 export function show(screen) {
   for (const id of ["welcome", "interview", "plan"]) $(id).hidden = id !== screen;
   $("restart").hidden = screen === "welcome";

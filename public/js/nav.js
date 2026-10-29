@@ -30,7 +30,8 @@ export function renderNav() {
 }
 
 /* One section at a time: the menu works as tabs (arrow keys move between them). */
-export const tabs = [...document.querySelectorAll('#plan-tabs [role="tab"]')];
+/** @type {HTMLButtonElement[]} */
+export const tabs = [...document.querySelectorAll('#plan-tabs [role="tab"]')].map((t) => /** @type {HTMLButtonElement} */ (t));
 export const SECTIONS = tabs.map((t) => t.dataset.sec);
 export function showSection(sec, { focus = false } = {}) {
   if (!SECTIONS.includes(sec)) sec = SECTIONS[0];

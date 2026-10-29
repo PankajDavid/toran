@@ -105,12 +105,14 @@ export async function downloadCalendar(button) {
 }
 export const calendarSignature = () => JSON.stringify(state.planInput); // re-offer only if the event itself changes
 $("restore-file").addEventListener("change", (e) => {
-  restoreFrom(e.target.files?.[0]);
-  e.target.value = "";
+  const input = /** @type {HTMLInputElement} */ (e.target);
+  restoreFrom(input.files?.[0]);
+  input.value = "";
 });
 $("restore-file-plan").addEventListener("change", (e) => {
-  restoreFrom(e.target.files?.[0]);
-  e.target.value = "";
+  const input = /** @type {HTMLInputElement} */ (e.target);
+  restoreFrom(input.files?.[0]);
+  input.value = "";
 });
 $("backup-btn").addEventListener("click", () => {
   backupPlan();

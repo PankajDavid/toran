@@ -47,6 +47,11 @@ export function vendorIntro(v, cat) {
 }
 
 /** Adds or updates a tracked vendor after the Quote Checker reads or books their quote. */
+/**
+ * @param {string} lineKey budget line the quote is for
+ * @param {string} name vendor name as on the quote
+ * @param {{ status: string; minStatus?: boolean; totalINR?: number; booking?: { taskId?: string; lineKey?: string }; advanceINR?: number }} update
+ */
 export function trackVendorFromQuote(lineKey, name, { status, minStatus = false, totalINR, booking, advanceINR }) {
   const cat = state.plan?.vendors.find((v) => v.line === lineKey);
   if (!cat) return;

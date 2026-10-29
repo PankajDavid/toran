@@ -2,7 +2,7 @@
  * Toran front end · Quote Checker: read a quotation, confirm, check, compare, book.
  * Every piece of text is inserted with textContent (never innerHTML).
  */
-import { $, el } from "./dom.js";
+import { $, el, field } from "./dom.js";
 import { inr } from "./format.js";
 import { api, save, state, waitForAiSlot } from "./store.js";
 import { parseRupees, refreshPlan } from "./plan.js";
@@ -18,7 +18,7 @@ export let prefillVendor = ""; // set when "Check their quote" is pressed on a v
 
 /** "Check their quote" from the vendor list: opens the Quote Checker for that vendor. */
 export function checkVendorQuote(v, c) {
-  $("quote-category").value = c.line;
+  field("quote-category").value = c.line;
   draftCategory = c.line;
   prefillVendor = v.name;
   $("quote-verdict").replaceChildren();
@@ -37,7 +37,7 @@ export function lineByKey(key) {
 }
 
 export function renderQuoteStart() {
-  const sel = $("quote-category");
+  const sel = field("quote-category");
   const keep = sel.value;
   sel.replaceChildren(...quoteLines().map((l) => el("option", { value: l.key }, `${l.label} (planned ${inr(l.plannedINR)})`)));
   if (keep && lineByKey(keep)) sel.value = keep;
@@ -71,7 +71,7 @@ export async function readQuoteFile(file) {
   const status = $("quote-status");
   $("quote-verdict").replaceChildren();
   $("quote-confirm").replaceChildren();
-  draftCategory = $("quote-category").value;
+  draftCategory = field("quote-category").value;
   try {
     status.textContent = "Preparing the photo…";
     const { blob, type } = await prepareQuoteFile(file);
@@ -94,7 +94,7 @@ export async function readQuoteFile(file) {
   } catch (err) {
     status.textContent = err.message || "Something went wrong. Please try again.";
   } finally {
-    $("quote-file").value = "";
+    field("quote-file").value = "";
   }
 }
 
@@ -112,7 +112,7 @@ export function parseNum(text, { int = false } = {}) {
 /** The editable table. Nothing is checked until the user confirms these numbers. */
 export function renderConfirm(draft, fromAi) {
   const box = $("quote-confirm");
-  const line = lineByKey(draftCategory || $("quote-category").value);
+  const line = lineByKey(draftCategory || field("quote-category").value);
   const rows = el("tbody");
   const addRow = (l = {}) => {
     const tr = el(
@@ -249,7 +249,7 @@ export function renderConfirm(draft, fromAi) {
     msg.textContent = "";
     const lines = [];
     for (const tr of rows.querySelectorAll("tr")) {
-      const get = (k) => tr.querySelector(`[data-f="${k}"]`).value;
+      const get = (k) => /** @type {HTMLInputElement} */ (tr.querySelector(`[data-f="${k}"]`)).value;
       const description = get("description").trim();
       const q = parseNum(get("quantity")),
         r = parseNum(get("rate")),
@@ -276,7 +276,7 @@ export function renderConfirm(draft, fromAi) {
       return;
     }
     const val = (id, opt) => {
-      const v = parseNum($(id).value, opt);
+      const v = parseNum(field(id).value, opt);
       if (v === null) throw new Error(id);
       return v;
     };
@@ -286,8 +286,8 @@ export function renderConfirm(draft, fromAi) {
       const advPct = val("q-advpct"),
         advAmt = val("q-advamt", { int: true });
       quote = {
-        category: draftCategory || $("quote-category").value,
-        ...($("q-vendor").value.trim() ? { vendorName: $("q-vendor").value.trim() } : {}),
+        category: draftCategory || field("quote-category").value,
+        ...(field("q-vendor").value.trim() ? { vendorName: field("q-vendor").value.trim() } : {}),
         lines,
         ...(val("q-subtotal", { int: true }) !== undefined ? { subtotalINR: val("q-subtotal", { int: true }) } : {}),
         gst: {
@@ -627,11 +627,11 @@ export function renderSavedQuotes() {
 }
 
 $("quote-file").addEventListener("change", (e) => {
-  const f = e.target.files?.[0];
+  const f = /** @type {HTMLInputElement} */ (e.target).files?.[0];
   if (f) readQuoteFile(f);
 });
 $("quote-manual").addEventListener("click", () => {
-  draftCategory = $("quote-category").value;
+  draftCategory = field("quote-category").value;
   $("quote-verdict").replaceChildren();
   $("quote-status").textContent = "";
   renderConfirm({ lines: [{}], gst: { status: "not-mentioned" } }, false);

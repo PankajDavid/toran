@@ -1,0 +1,16 @@
+{
+  // Type-checks the browser code (plain JavaScript ES modules) without a build step.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": ["public/js/**/*.js", "public/js/types.d.ts"]
+}

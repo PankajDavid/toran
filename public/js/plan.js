@@ -72,7 +72,7 @@ export function playReady() {
   const ready = $("ready");
   ready.hidden = false;
   // Restart CSS animations each time.
-  const clone = ready.cloneNode(true);
+  const clone = /** @type {HTMLElement} */ (ready.cloneNode(true));
   ready.replaceWith(clone);
   clone.addEventListener("animationend", (e) => {
     if (e.animationName === "ready-out") clone.hidden = true;

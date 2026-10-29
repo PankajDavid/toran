@@ -13,7 +13,9 @@ window.addEventListener("beforeinstallprompt", (e) => {
   $("install-btn").hidden = false;
   updateInstall();
 });
-export const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+export const isStandalone = () =>
+  window.matchMedia("(display-mode: standalone)").matches ||
+  /** @type {Navigator & { standalone?: boolean }} */ (navigator).standalone === true;
 export function updateInstall() {
   let dismissed = false;
   try {
