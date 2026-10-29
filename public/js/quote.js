@@ -94,11 +94,10 @@ function comparisonTable(cat, qs) {
       el(
         "thead",
         null,
-        el(
-          "tr",
-          null,
-          ["Vendor", "True total", "Issues", ""].map((h) => el("th", { scope: "col" }, h)),
-        ),
+        el("tr", null, [
+          ...["Vendor", "True total", "Issues"].map((h) => el("th", { scope: "col" }, h)),
+          el("th", { scope: "col" }, el("span", { class: "sr-only" }, "Actions")),
+        ]),
       ),
       el(
         "tbody",

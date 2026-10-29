@@ -212,11 +212,10 @@ export function renderConfirm(draft, fromAi) {
         el(
           "thead",
           null,
-          el(
-            "tr",
-            null,
-            ["Item", "Qty", "Unit", "Rate ₹", "Amount ₹", ""].map((h) => el("th", { scope: "col" }, h)),
-          ),
+          el("tr", null, [
+            ...["Item", "Qty", "Unit", "Rate ₹", "Amount ₹"].map((h) => el("th", { scope: "col" }, h)),
+            el("th", { scope: "col" }, el("span", { class: "sr-only" }, "Remove line")),
+          ]),
         ),
         rows,
       ),

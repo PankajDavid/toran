@@ -46,32 +46,80 @@ test("the plan link opens the same plan on another device", async ({ page, brows
   await expect(other.locator("#plan-title")).toContainText("Punjabi wedding");
 });
 
-test("no horizontal scrolling on any section", async ({ page }) => {
+test("no horizontal scrolling on any section, including the quote table and vendor results", async ({ page }) => {
   await makePlan(page);
+  // clientWidth is the screen; scrollWidth grows if anything sticks out. (innerWidth grows too on phones.)
+  const fits = async (label: string) => {
+    const [scroll, client] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+    expect(scroll, label).toBeLessThanOrEqual(client);
+  };
   for (const name of ["Budget", "Timeline", "Vendors", "Quote Checker", "Ideas", "Invitation", "Tips"]) {
     await tab(page, name).click();
-    const [scroll, width] = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
-    expect(scroll, name).toBeLessThanOrEqual(width);
+    await fits(name);
   }
+  await tab(page, "Quote Checker").click();
+  await page.getByRole("button", { name: "Type it in instead" }).click();
+  await fits("quote confirm table");
+  await tab(page, "Vendors").click();
+  const cat = page.locator("details.vendor").filter({ has: page.locator("summary .v-cat", { hasText: /^Caterer$/ }) });
+  await cat.locator("summary").click();
+  await cat.getByRole("button", { name: "Search", exact: true }).click();
+  await cat.locator(".v-found-item").first().waitFor();
+  await fits("vendor search results");
 });
 
-test("accessibility: axe finds no WCAG 2.1 AA problems on any screen", async ({ browser }) => {
+test("accessibility: axe finds no WCAG 2.2 AA or best-practice problems on any screen or state", async ({ browser }) => {
+  test.setTimeout(120_000); // 13 full scans
   // axe is injected as a script, which our own Content Security Policy rightly blocks; bypass it for the test only.
   const page = await (await browser.newContext({ bypassCSP: true })).newPage();
   const axe = await readFile(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
   const scan = async (label: string) => {
     await page.addScriptTag({ content: axe });
     const violations = await page.evaluate(async () => {
-      const w = window as unknown as { axe: { run: (ctx: Document, o: object) => Promise<{ violations: { id: string }[] }> } };
-      return (await w.axe.run(document, { runOnly: ["wcag2a", "wcag2aa", "wcag21aa"] })).violations.map((v) => v.id);
+      const w = window as unknown as {
+        axe: { run: (ctx: Document, o: object) => Promise<{ violations: { id: string; nodes: { target: string[] }[] }[] }> };
+      };
+      const r = await w.axe.run(document, { runOnly: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"] });
+      return r.violations.map(
+        (v) =>
+          `${v.id}: ${v.nodes
+            .map((n) => n.target.join(" "))
+            .slice(0, 3)
+            .join(", ")}`,
+      );
     });
     expect(violations, label).toEqual([]);
   };
   await page.goto("/");
   await scan("welcome");
+  await page.getByRole("button", { name: "Let's plan" }).click();
+  await page.locator("#chips .chip").first().waitFor();
+  await scan("interview");
+  await page.evaluate(() => localStorage.clear());
   await makePlan(page);
   for (const name of ["Budget", "Timeline", "Vendors", "Quote Checker", "Ideas", "Invitation", "Tips"]) {
     await tab(page, name).click();
     await scan(name);
   }
+  // Interactive states: an open vendor category with search results, a booking form, a quote verdict.
+  await tab(page, "Vendors").click();
+  const cat = page.locator("details.vendor").filter({ has: page.locator("summary .v-cat", { hasText: /^Caterer$/ }) });
+  await cat.locator("summary").click();
+  await cat.getByRole("button", { name: "Search", exact: true }).click();
+  await cat.locator(".v-found-item").first().waitFor();
+  await scan("vendor search results");
+  await tab(page, "Timeline").click();
+  await page.locator('label[for="task-w-venue"]').click();
+  await scan("booking form");
+  await tab(page, "Quote Checker").click();
+  await page.getByRole("button", { name: "Type it in instead" }).click();
+  await scan("quote confirm table");
+  const cells = page.locator(".quote-form input:not([id])");
+  await cells.nth(0).fill("Veg buffet per plate");
+  await cells.nth(1).fill("250");
+  await cells.nth(3).fill("650");
+  await cells.nth(4).fill("172500");
+  await page.locator(".quote-form button[type=submit]").click();
+  await page.locator(".verdict").waitFor();
+  await scan("quote verdict");
 });

@@ -1127,6 +1127,10 @@ tr.booked th {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   max-width: 100%;
+  /* Inside a flex column a child grows to its content by default; this keeps the scroll inside the box. */
+  min-width: 0;
+  /* Contains screen-reader-only labels (position: absolute) so they can't widen the page. */
+  position: relative;
 }
 .quote-table {
   border-collapse: collapse;
