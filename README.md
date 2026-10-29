@@ -56,7 +56,7 @@ We also tried Gemini's Google Search grounding for live market prices. Productio
 
 ```bash
 npm install
-npm test          # 340 unit and API tests
+npm test          # 341 unit and API tests
 npm run test:coverage  # coverage: 98% of lines, 88% of branches; CI fails below 95% / 85%
 npm run typecheck
 npm run lint      # Biome: lint + format check (TypeScript, browser JS, CSS)
@@ -68,11 +68,20 @@ Tests cover the budget (every line adds up to the exact total for every event ty
 
 Browser tests (`e2e/`) drive the real app on a phone and a desktop screen: the Hinglish interview, exact budget totals, tabs and keyboard navigation, bookings, Toran suggests, the calendar file, Google Maps search (fake listings, no key needed), the Quote Checker, never booking a vendor twice, backup and restore, the plan link, no horizontal scrolling, and an axe accessibility scan of every screen. After tests pass we deliberately break the code to confirm a test fails.
 
+## Code quality
+
+- TypeScript strict on the server; the browser code (plain ES modules, no build step) is type-checked with `checkJs`.
+- Biome lints and formats everything; every function is kept at cognitive complexity 20 or less, enforced in CI.
+- One module per job: no browser file over 300 lines; each quote check, interview step and suggestion is its own small, documented function.
+- Refactors are checked by behaviour, not just by tests: the interview parser was compared against its previous version on 28,000 inputs, the Quote Checker on every sample quotation.
+
 ## Accessibility
 
-Keyboard-operable throughout (sections menu is an ARIA tablist with arrow keys), visible focus, skip link, labelled form fields, live regions for chat and results, 44 px touch targets, reduced-motion support, works at 320 px wide.
+Keyboard-operable throughout (sections menu is an ARIA tablist with arrow keys), visible focus, skip link, labelled form fields, live regions for chat and results, 44 px touch targets, reduced-motion support, no sideways scrolling on phones. An automated axe scan (every WCAG 2.2 A/AA rule plus best practice) runs in CI on 13 screens and states.
 
 ## Architecture
+
+Full write-up: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Security design: [SECURITY.md](SECURITY.md).
 
 ```
 public/            Plain HTML and CSS, PWA files (no framework, no build step)
