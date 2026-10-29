@@ -12,7 +12,8 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "check": "npm run typecheck && npm run lint && npm test",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +30,7 @@
     "@playwright/test": "1.63.0",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "5.0.5",
     "axe-core": "4.10.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

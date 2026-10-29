@@ -51,35 +51,50 @@ export const offlineClient: AiClient = {
   },
 };
 
+/** The one SDK call we use, so tests can stand in for Google without a network. */
+export interface GenerateContentApi {
+  generateContent(params: {
+    model: string;
+    contents: { role: string; parts: AiPart[] }[];
+    config: Record<string, unknown>;
+  }): Promise<{ text?: string | undefined }>;
+}
+
 export interface GeminiOptions {
   apiKey: string;
   smartModel?: string;
   fastModel?: string;
+  /** Injected in tests; production uses the Google Gen AI SDK. */
+  api?: GenerateContentApi;
+}
+
+export const DEFAULT_MODELS = { smart: "gemini-3.8-flash", fast: "gemini-3.5-flash-lite" } as const;
+const DEFAULT_TIMEOUT_MS = 20_000;
+
+/** Keeps only the HTTP status and Google's status word: upstream messages can echo request details. */
+export function upstreamError(err: unknown): AiError {
+  const e = err as { status?: number; message?: string };
+  const statusWord =
+    /\b(NOT_FOUND|PERMISSION_DENIED|UNAUTHENTICATED|INVALID_ARGUMENT|RESOURCE_EXHAUSTED|FAILED_PRECONDITION|UNAVAILABLE)\b/.exec(
+      e?.message ?? "",
+    )?.[1];
+  return new AiError("upstream", "AI request failed", [e?.status, statusWord].filter(Boolean).join(" ") || undefined);
 }
 
 export function createGeminiClient(opts: GeminiOptions): AiClient {
-  const genai = new GoogleGenAI({ apiKey: opts.apiKey });
+  const api: GenerateContentApi = opts.api ?? (new GoogleGenAI({ apiKey: opts.apiKey }).models as unknown as GenerateContentApi);
   const models = {
-    smart: opts.smartModel || "gemini-3.8-flash",
-    fast: opts.fastModel || "gemini-3.5-flash-lite",
-  };
-
-  const upstream = (err: unknown) => {
-    const e = err as { status?: number; message?: string };
-    const statusWord =
-      /\b(NOT_FOUND|PERMISSION_DENIED|UNAUTHENTICATED|INVALID_ARGUMENT|RESOURCE_EXHAUSTED|FAILED_PRECONDITION|UNAVAILABLE)\b/.exec(
-        e?.message ?? "",
-      )?.[1];
-    return new AiError("upstream", "AI request failed", [e?.status, statusWord].filter(Boolean).join(" ") || undefined);
+    smart: opts.smartModel || DEFAULT_MODELS.smart,
+    fast: opts.fastModel || DEFAULT_MODELS.fast,
   };
 
   return {
     available: true,
     async generateJson(req) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), req.timeoutMs ?? 20_000);
+      const timer = setTimeout(() => controller.abort(), req.timeoutMs ?? DEFAULT_TIMEOUT_MS);
       try {
-        const res = await genai.models.generateContent({
+        const res = await api.generateContent({
           model: models[req.tier ?? "smart"],
           contents: [{ role: "user", parts: req.parts }],
           config: {
@@ -104,7 +119,7 @@ export function createGeminiClient(opts: GeminiOptions): AiClient {
         if (controller.signal.aborted) throw new AiError("timeout", "AI request timed out");
         // Never surface upstream messages to users; they can contain request details.
         // Keep only the HTTP status and Google's status word for server-side diagnosis.
-        throw upstream(err);
+        throw upstreamError(err);
       } finally {
         clearTimeout(timer);
       }

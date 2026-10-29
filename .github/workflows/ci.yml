@@ -23,7 +23,8 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test
+      - name: Unit and API tests with coverage (fails below 95% lines)
+        run: npm run test:coverage
       - run: npm run build
 
   e2e:

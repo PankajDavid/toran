@@ -3,7 +3,15 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { createApp } from "../app.js";
 import { offlineClient } from "../ai/client.js";
-import { createPlacesClient, FindVendorsSchema, offlinePlaces, sanitizePlaces, searchText, SEARCH_TERMS } from "./places.js";
+import {
+  createPlacesClient,
+  FindVendorsSchema,
+  offlinePlaces,
+  placesClientFromEnv,
+  sanitizePlaces,
+  searchText,
+  SEARCH_TERMS,
+} from "./places.js";
 import { buildVendorChecklist } from "../engine/vendors.js";
 import { EVENT_TYPES, SUB_TYPES } from "../engine/config.js";
 
@@ -100,6 +108,36 @@ describe("Google client", () => {
     const body = JSON.parse(String(seen!.init.body));
     expect(body.locationBias.circle.center).toEqual({ latitude: 30.7, longitude: 76.85 });
     expect(body.regionCode).toBe("IN");
+  });
+  it("reports a network failure or a timeout without detail from Google", async () => {
+    const down = (async () => {
+      throw new TypeError("fetch failed");
+    }) as unknown as typeof fetch;
+    await expect(createPlacesClient("K", down).search({ category: "venue", city: "Delhi" })).rejects.toMatchObject({
+      kind: "upstream",
+      detail: "network",
+    });
+    const slow = (async () => {
+      throw Object.assign(new Error("timed out"), { name: "TimeoutError" });
+    }) as unknown as typeof fetch;
+    await expect(createPlacesClient("K", slow).search({ category: "venue", city: "Delhi" })).rejects.toMatchObject({ kind: "timeout" });
+  });
+  it("treats a reply that isn't JSON as no results", async () => {
+    const junk = (async () => new Response("<html>oops</html>", { status: 200 })) as unknown as typeof fetch;
+    expect(await createPlacesClient("K", junk).search({ category: "venue", city: "Delhi" })).toEqual([]);
+  });
+  it("is off without a key, and the offline client always refuses", async () => {
+    const before = process.env.GOOGLE_MAPS_API_KEY;
+    delete process.env.GOOGLE_MAPS_API_KEY;
+    expect(placesClientFromEnv().available).toBe(false);
+    process.env.GOOGLE_MAPS_API_KEY = "k";
+    expect(placesClientFromEnv().available).toBe(true);
+    if (before === undefined) delete process.env.GOOGLE_MAPS_API_KEY;
+    else process.env.GOOGLE_MAPS_API_KEY = before;
+    await expect(offlinePlaces.search({ category: "venue", city: "Delhi" })).rejects.toMatchObject({ kind: "unavailable" });
+  });
+  it("drops listings whose Maps link isn't a valid URL", () => {
+    expect(sanitizePlaces({ places: [place({ googleMapsUri: "not a url" })] })).toEqual([]);
   });
   it("turns an upstream error into PlacesError", async () => {
     const fake = (async () => new Response("denied", { status: 403 })) as unknown as typeof fetch;
