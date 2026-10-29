@@ -50,15 +50,26 @@ export function createApp(opts: AppOptions = {}) {
         directives: {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'"],
-          styleSrc: ["'self'", "https://fonts.googleapis.com"],
-          fontSrc: ["'self'", "https://fonts.gstatic.com"],
+          styleSrc: ["'self'"],
+          fontSrc: ["'self'"],
           imgSrc: ["'self'", "data:"],
           connectSrc: ["'self'"],
           frameAncestors: ["'none'"],
+          formAction: ["'self'"],
+          baseUri: ["'self'"],
+          objectSrc: ["'none'"],
         },
       },
+      // Keep the page (and the plan in the link) to ourselves when a link is followed.
+      referrerPolicy: { policy: "no-referrer" },
+      strictTransportSecurity: { maxAge: 63_072_000, includeSubDomains: true, preload: true },
     }),
   );
+  // Only the features Toran uses: the microphone (voice answers) and location ("near me"), from this site only.
+  app.use((_req, res, next) => {
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(self), geolocation=(self), payment=(), usb=(), interest-cohort=()");
+    next();
+  });
   // No CORS headers are sent: browsers will only allow same-origin calls.
 
   // Minimal access log: method, path, status, time. Never bodies or user details.

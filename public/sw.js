@@ -1,7 +1,7 @@
 // Toran service worker: lets the app open fast and work offline, and makes it installable.
 // Network first, so updates always arrive; the cache is only a fallback.
 // API calls are never cached (plans are built fresh and never stored here).
-const CACHE = "toran-v17";
+const CACHE = "toran-v18";
 const SHELL = [
   "/",
   "/js/main.js",

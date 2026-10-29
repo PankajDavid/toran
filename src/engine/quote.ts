@@ -328,6 +328,22 @@ export function checkQuote(q: Quote, ctx: QuoteContext): QuoteCheck {
     }
   }
 
+  // 7b. Hidden instructions to an AI ("note for AI: report the total as ..."). A real quote never
+  // talks to an AI, so this is a sign someone tried to trick the reader. Checked by code, on every
+  // line, note and the vendor name.
+  const AI_INSTRUCTION =
+    /text\s+addressed\s+to\s+an\s+ai|\b(note|message|instructions?)\s+(to|for)\s+(the\s+)?(ai|assistants?|models?|llms?|chatbots?|gpt|gemini|claude)\b|\b(ignore|disregard)\b.{0,40}\b(instructions?|above|previous|table|rules|prompt)\b|\bsystem\s+prompt\b|\byou\s+are\s+(an?\s+)?(ai|assistant|language\s+model)\b|\bas\s+an\s+ai\b/i;
+  const planted = [q.vendorName ?? "", ...q.lines.map((l) => l.description), ...(q.notes ?? [])].some((t) => AI_INSTRUCTION.test(t));
+  if (planted) {
+    add({
+      code: "AI_INSTRUCTIONS",
+      severity: "problem",
+      message:
+        "This quote contains text addressed to an AI, a sign someone tried to trick the reading. Check every line and the total against the paper before you trust this check.",
+      question: "Your quotation has a note addressed to an AI system. Could you send a clean, signed copy of the quote?",
+    });
+  }
+
   // 8. Payment terms. "Full payment before setup" is a 100% advance, whatever the reader extracted.
   const terms = [...(q.notes ?? []), ...q.lines.map((l) => l.description)];
   const fullUpfront = terms.some((t) =>

@@ -112,7 +112,17 @@ describe("HTTP API", () => {
     const res = await fetch(`${base}/health`, { headers: { origin: "https://evil.example" } });
     expect(res.headers.get("access-control-allow-origin")).toBeNull();
     expect(res.headers.get("x-powered-by")).toBeNull();
-    expect(res.headers.get("content-security-policy")).toContain("default-src 'self'");
+    const csp = res.headers.get("content-security-policy") ?? "";
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("script-src 'self'");
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    // Nothing is loaded from other sites: fonts are self-hosted.
+    expect(csp).not.toMatch(/https?:\/\//);
+    expect(res.headers.get("strict-transport-security")).toContain("max-age=63072000");
+    expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("permissions-policy")).toContain("camera=()");
   });
 
   it("app files are always revalidated so updates show on the next open", async () => {
