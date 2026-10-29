@@ -80,46 +80,60 @@ const PlaceSchema = z.object({
   businessStatus: z.string().optional(),
 });
 
-/** Keeps only open businesses with a valid Google Maps link; drops anything malformed. */
-export function sanitizePlaces(raw: unknown): FoundVendor[] {
-  const list =
-    raw && typeof raw === "object" && Array.isArray((raw as { places?: unknown }).places) ? (raw as { places: unknown[] }).places : [];
-  const out: FoundVendor[] = [];
-  for (const p of list.slice(0, 20)) {
-    const r = PlaceSchema.safeParse(p);
-    if (!r.success) continue;
-    const v = r.data;
-    if (v.businessStatus && v.businessStatus !== "OPERATIONAL") continue;
-    let maps: URL;
-    try {
-      maps = new URL(v.googleMapsUri);
-    } catch {
-      continue;
-    }
-    if (maps.protocol !== "https:" || !/(^|\.)google\.[a-z.]+$|(^|\.)goo\.gl$/.test(maps.hostname)) continue;
-    let website: string | undefined;
-    if (v.websiteUri) {
-      try {
-        const w = new URL(v.websiteUri);
-        if (w.protocol === "https:" || w.protocol === "http:") website = w.href.slice(0, 300);
-      } catch {
-        /* drop */
-      }
-    }
-    const phone = v.nationalPhoneNumber && /^[\d +()-]{6,20}$/.test(v.nationalPhoneNumber) ? v.nationalPhoneNumber : undefined;
-    out.push({
-      id: v.id,
-      name: clean(v.displayName.text, 80),
-      ...(v.formattedAddress ? { address: clean(v.formattedAddress, 160) } : {}),
-      ...(phone ? { phone } : {}),
-      ...(v.rating !== undefined ? { rating: Math.round(v.rating * 10) / 10 } : {}),
-      ...(v.userRatingCount !== undefined ? { ratingCount: v.userRatingCount } : {}),
-      mapsUrl: maps.href,
-      ...(website ? { website } : {}),
-    });
-    if (out.length >= 8) break;
+/** A Google Maps link we trust: https on a google.* or goo.gl host. Anything else is dropped. */
+function safeMapsUrl(uri: string): string | null {
+  try {
+    const u = new URL(uri);
+    return u.protocol === "https:" && /(^|\.)google\.[a-z.]+$|(^|\.)goo\.gl$/.test(u.hostname) ? u.href : null;
+  } catch {
+    return null;
   }
-  return out;
+}
+
+/** A business website, only if it's an http(s) link. */
+function safeWebsite(uri: string | undefined): string | undefined {
+  if (!uri) return undefined;
+  try {
+    const u = new URL(uri);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.href.slice(0, 300) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const PHONE = /^[\d +()-]{6,20}$/;
+const MAX_RESULTS = 8;
+
+/** One listing in our own shape, or null if it's closed or its Maps link isn't safe. */
+function toVendor(p: unknown): FoundVendor | null {
+  const r = PlaceSchema.safeParse(p);
+  if (!r.success) return null;
+  const v = r.data;
+  const mapsUrl = safeMapsUrl(v.googleMapsUri);
+  if ((v.businessStatus && v.businessStatus !== "OPERATIONAL") || !mapsUrl) return null;
+  const website = safeWebsite(v.websiteUri);
+  const phone = v.nationalPhoneNumber && PHONE.test(v.nationalPhoneNumber) ? v.nationalPhoneNumber : undefined;
+  return {
+    id: v.id,
+    name: clean(v.displayName.text, 80),
+    ...(v.formattedAddress ? { address: clean(v.formattedAddress, 160) } : {}),
+    ...(phone ? { phone } : {}),
+    ...(v.rating !== undefined ? { rating: Math.round(v.rating * 10) / 10 } : {}),
+    ...(v.userRatingCount !== undefined ? { ratingCount: v.userRatingCount } : {}),
+    mapsUrl,
+    ...(website ? { website } : {}),
+  };
+}
+
+/** Keeps only open businesses with a valid Google Maps link; drops anything malformed. At most 8. */
+export function sanitizePlaces(raw: unknown): FoundVendor[] {
+  const places = (raw as { places?: unknown } | null)?.places;
+  if (!Array.isArray(places)) return [];
+  return places
+    .slice(0, 20)
+    .map(toVendor)
+    .filter((v): v is FoundVendor => v !== null)
+    .slice(0, MAX_RESULTS);
 }
 
 /** The text sent to Google: a fixed term from our list, plus the validated city. */

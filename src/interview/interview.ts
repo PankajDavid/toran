@@ -84,6 +84,74 @@ function changedFields(before: Known, after: Known): KnownField[] {
   return (Object.keys(after) as KnownField[]).filter((f) => JSON.stringify(before[f]) !== JSON.stringify(after[f]));
 }
 
+/** Fields whose value changed, and the guesses to keep (a stated value clears a guess). */
+interface Step {
+  known: Known;
+  changed: KnownField[];
+}
+
+/** 1. A tapped button is an explicit choice: it confirms, never guesses. */
+function applyButton(known: Known, set: unknown, today: string, guessed: Set<KnownField>): Known {
+  if (!set || typeof set !== "object" || Array.isArray(set)) return known;
+  // Validate the button's values in context (e.g. wedding functions need the event type),
+  // then keep only fields the button actually set.
+  const fromButton = sanitizeKnown(mergeKnown(known, set as Known), today);
+  for (const f of Object.keys(set) as KnownField[]) if (fromButton[f] !== undefined) guessed.delete(f);
+  return fromButton;
+}
+
+/** 2. Fast, free, deterministic reading of typed or spoken text. */
+function readLocally(text: string, today: string, asking: KnownField | undefined, known: Known, guessed: Set<KnownField>): Step {
+  const local = parseLocal(text, today, { asking, known });
+  const next = sanitizeKnown(mergeKnown(known, local.fields), today);
+  const changed = changedFields(known, next);
+  for (const f of changed) guessed.delete(f);
+  for (const f of local.guessed) if (changed.includes(f)) guessed.add(f);
+  return { known: next, changed };
+}
+
+/** Keeps only AI fields the local reader didn't find (regex results are exact), filling the city tier if known. */
+function aiFillOnly(aiFields: Known, localChanged: readonly KnownField[], known: Known): Known {
+  const fill = Object.fromEntries(Object.entries(aiFields).filter(([k]) => !localChanged.includes(k as KnownField))) as Known;
+  if (fill.city && !fill.cityTier && !known.cityTier) {
+    const tier = CITY_TIERS[fill.city.toLowerCase()];
+    if (tier) fill.cityTier = tier;
+  }
+  return fill;
+}
+
+/** 3. The AI, only for what the local reader missed. Its readings are validated like any input. Throws on AI failure. */
+async function readWithAi(
+  text: string,
+  today: string,
+  asking: KnownField | undefined,
+  known: Known,
+  localChanged: readonly KnownField[],
+  guessed: Set<KnownField>,
+  ai: AiClient,
+): Promise<Step> {
+  const raw = await ai.generateJson({
+    tier: "fast",
+    thinking: "minimal",
+    timeoutMs: 8_000,
+    system: AI_SYSTEM,
+    schema: AI_SCHEMA as unknown as Record<string, unknown>,
+    parts: [{ text: `Today's date: ${today}. The question just asked was about: ${asking ?? "the event"}.` }, asData("user_answer", text)],
+  });
+  const merged = sanitizeKnown(mergeKnown(known, aiFillOnly(sanitizeKnown(raw, today), localChanged, known)), today);
+  const changed = changedFields(known, merged);
+  const inferred = new Set(asFields((raw as { inferred?: unknown })?.inferred));
+  for (const f of changed) {
+    if (inferred.has(f)) guessed.add(f);
+    else guessed.delete(f);
+  }
+  return { known: merged, changed };
+}
+
+/** Ask the AI when the local reader missed the question being asked, or the answer is a long free sentence. */
+const needsAi = (text: string, asking: KnownField | undefined, localChanged: readonly KnownField[]) =>
+  (asking !== undefined && !localChanged.includes(asking)) || text.split(/\s+/).length >= 6;
+
 /**
  * One interview turn: apply a tapped button, read typed/spoken text locally,
  * ask the AI only when the local reader missed what we were asking for (or the
@@ -91,70 +159,23 @@ function changedFields(before: Known, after: Known): KnownField[] {
  */
 export async function runInterviewTurn(turn: InterviewTurn, today: string, ai: AiClient): Promise<InterviewResult> {
   const before = sanitizeKnown(turn.known, today);
-  let known = before;
-  let guessed = new Set<KnownField>(asFields(turn.guessed));
+  const guessed = new Set<KnownField>(asFields(turn.guessed));
   const asking = nextQuestion(before)?.field;
-
-  // 1. A tapped button is an explicit choice: it confirms, never guesses.
-  if (turn.set && typeof turn.set === "object" && !Array.isArray(turn.set)) {
-    // Validate the button's values in context (e.g. wedding functions need the event type),
-    // then keep only fields the button actually set.
-    const fromButton = sanitizeKnown(mergeKnown(known, turn.set as Known), today);
-    const tapped = (Object.keys(turn.set) as KnownField[]).filter((f) => fromButton[f] !== undefined);
-    for (const f of tapped) guessed.delete(f);
-    known = fromButton;
-  }
-
+  let known = applyButton(before, turn.set, today, guessed);
   const text = turn.text?.trim() ?? "";
   let aiUsed = false;
   let understoodSomething = turn.set !== undefined;
 
   if (text) {
-    // 2. Fast, free, deterministic reading.
-    const local = parseLocal(text, today, { asking, known });
-    const localFields = sanitizeKnown(mergeKnown(known, local.fields), today);
-    const localChanged = changedFields(known, localFields);
-    for (const f of localChanged) guessed.delete(f);
-    for (const f of local.guessed) if (localChanged.includes(f)) guessed.add(f);
-    known = localFields;
-    if (localChanged.length) understoodSomething = true;
-
-    // 3. AI only for what the local reader missed.
-    const missedTheQuestion = asking !== undefined && !localChanged.includes(asking);
-    const longSentence = text.split(/\s+/).length >= 6;
-    if (ai.available && (missedTheQuestion || longSentence)) {
+    const local = readLocally(text, today, asking, known, guessed);
+    known = local.known;
+    understoodSomething ||= local.changed.length > 0;
+    if (ai.available && needsAi(text, asking, local.changed)) {
       try {
-        const raw = await ai.generateJson({
-          tier: "fast",
-          thinking: "minimal",
-          timeoutMs: 8_000,
-          system: AI_SYSTEM,
-          schema: AI_SCHEMA as unknown as Record<string, unknown>,
-          parts: [
-            { text: `Today's date: ${today}. The question just asked was about: ${asking ?? "the event"}.` },
-            asData("user_answer", text),
-          ],
-        });
+        const fromAi = await readWithAi(text, today, asking, known, local.changed, guessed, ai);
         aiUsed = true;
-        const aiFields = sanitizeKnown(raw, today);
-        // Local readings win where both found something: regex results are exact.
-        const fillOnly: Known = {};
-        for (const [k, v] of Object.entries(aiFields)) {
-          if (!localChanged.includes(k as KnownField)) (fillOnly as Record<string, unknown>)[k] = v;
-        }
-        if (fillOnly.city && !fillOnly.cityTier && !known.cityTier) {
-          const tier = CITY_TIERS[fillOnly.city.toLowerCase()];
-          if (tier) fillOnly.cityTier = tier;
-        }
-        const merged = sanitizeKnown(mergeKnown(known, fillOnly), today);
-        const aiChanged = changedFields(known, merged);
-        const inferred = new Set(asFields((raw as { inferred?: unknown })?.inferred));
-        for (const f of aiChanged) {
-          if (inferred.has(f)) guessed.add(f);
-          else guessed.delete(f);
-        }
-        known = merged;
-        if (aiChanged.length) understoodSomething = true;
+        known = fromAi.known;
+        understoodSomething ||= fromAi.changed.length > 0;
       } catch {
         // AI down or confused: carry on with what the local reader found.
       }
@@ -162,14 +183,12 @@ export async function runInterviewTurn(turn: InterviewTurn, today: string, ai: A
   }
 
   // Drop guesses for fields that no longer exist.
-  guessed = new Set([...guessed].filter((f) => known[f] !== undefined));
-  const next = nextQuestion(known);
-
+  const keptGuesses = [...guessed].filter((f) => known[f] !== undefined);
   return {
     known,
-    guessed: [...guessed],
+    guessed: keptGuesses,
     noted: changedFields(before, known),
-    next,
+    next: nextQuestion(known),
     planInput: toPlanInput(known),
     aiUsed,
     notUnderstood: text.length > 0 && !understoodSomething,

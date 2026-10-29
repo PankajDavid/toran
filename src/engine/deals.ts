@@ -68,30 +68,43 @@ export interface Reconciliation {
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
-export function reconcileBudget(budget: BudgetResult, tasks: readonly TimelineTask[], deals: readonly Deal[]): Reconciliation {
+/** Costs per budget line, plus the amounts by source (task or line) used to spot duplicates. */
+interface Collected {
+  perKey: Map<string, { agreed: number; advance: number }>;
+  taskAmounts: Map<string, number[]>;
+  lineAmount: Map<string, number>;
+}
+
+/**
+ * Sums costs per budget line. One entry per task and per line (the first wins); costs for
+ * unknown tasks or lines, tasks that don't book anything, or the contingency itself are ignored.
+ */
+function collectDeals(budget: BudgetResult, tasks: readonly TimelineTask[], deals: readonly Deal[]): Collected {
   const taskById = new Map(tasks.map((t) => [t.id, t]));
   const lineKeys = new Set(budget.lines.map((l) => l.key));
-
-  // Sum costs per budget line. Costs for unknown tasks/lines, tasks that don't book anything,
-  // or the contingency buffer itself are ignored.
-  const perKey = new Map<string, { agreed: number; advance: number }>();
+  const out: Collected = { perKey: new Map(), taskAmounts: new Map(), lineAmount: new Map() };
   const seen = new Set<string>();
-  // Remember amounts per line by source, to spot the same cost entered twice.
-  const taskAmounts = new Map<string, number[]>();
-  const lineAmount = new Map<string, number>();
   for (const d of deals) {
-    const id = "taskId" in d ? `task:${d.taskId}` : `line:${d.lineKey}`;
-    if (seen.has(id)) continue; // one entry per task and per line; the first wins
+    const byTask = "taskId" in d;
+    const id = byTask ? `task:${d.taskId}` : `line:${d.lineKey}`;
+    const key = byTask ? taskById.get(d.taskId)?.books : d.lineKey;
+    if (seen.has(id) || !key || !lineKeys.has(key) || key === "contingency") {
+      seen.add(id);
+      continue;
+    }
     seen.add(id);
-    const key = "taskId" in d ? taskById.get(d.taskId)?.books : d.lineKey;
-    if (!key || !lineKeys.has(key) || key === "contingency") continue;
-    if ("taskId" in d) taskAmounts.set(key, [...(taskAmounts.get(key) ?? []), d.agreedINR]);
-    else lineAmount.set(key, d.agreedINR);
-    const acc = perKey.get(key) ?? { agreed: 0, advance: 0 };
+    if (byTask) out.taskAmounts.set(key, [...(out.taskAmounts.get(key) ?? []), d.agreedINR]);
+    else out.lineAmount.set(key, d.agreedINR);
+    const acc = out.perKey.get(key) ?? { agreed: 0, advance: 0 };
     acc.agreed += d.agreedINR;
     acc.advance += d.advanceINR;
-    perKey.set(key, acc);
+    out.perKey.set(key, acc);
   }
+  return out;
+}
+
+export function reconcileBudget(budget: BudgetResult, tasks: readonly TimelineTask[], deals: readonly Deal[]): Reconciliation {
+  const { perKey, taskAmounts, lineAmount } = collectDeals(budget, tasks, deals);
 
   let agreedINR = 0,
     advanceINR = 0,

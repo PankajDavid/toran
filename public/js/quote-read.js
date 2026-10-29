@@ -73,6 +73,67 @@ export function parseNum(text, { int = false } = {}) {
   return int ? Math.round(n) : n;
 }
 
+/** `{ [key]: value }`, or nothing when the value is missing: keeps optional fields out of the quote. */
+const put = (key, value) => (value === undefined ? {} : { [key]: value });
+
+/**
+ * The confirmed table as quote lines. Blank rows are skipped.
+ * @param {HTMLElement} rows the table body
+ * @returns {{ lines: object[] } | { error: string }}
+ */
+export function readLines(rows) {
+  const lines = [];
+  for (const tr of rows.querySelectorAll("tr")) {
+    const get = (k) => /** @type {HTMLInputElement} */ (tr.querySelector(`[data-f="${k}"]`)).value;
+    const description = get("description").trim();
+    const quantity = parseNum(get("quantity"));
+    const rate = parseNum(get("rate"));
+    const amount = parseNum(get("amountINR"), { int: true });
+    const unit = get("unit").trim();
+    if (!description && quantity === undefined && rate === undefined && amount === undefined) continue;
+    if (!description) return { error: "Every line needs an item name." };
+    if (quantity === null || rate === null || amount === null) return { error: `Check the numbers on "${description}".` };
+    lines.push({
+      description,
+      ...put("quantity", quantity),
+      ...put("unit", unit || undefined),
+      ...put("rate", rate),
+      ...put("amountINR", amount === undefined ? undefined : Math.round(amount)),
+    });
+  }
+  return lines.length ? { lines } : { error: "Add at least one line." };
+}
+
+/**
+ * Subtotal, GST, total, minimum and advance from the fields below the table.
+ * @param {string} gstStatus
+ * @param {boolean} refundMentioned
+ * @returns {object | null} null when a field isn't a number
+ */
+export function readTerms(gstStatus, refundMentioned) {
+  const num = (id, opt) => parseNum(field(id).value, opt);
+  const values = {
+    subtotal: num("q-subtotal", { int: true }),
+    gstPct: num("q-gstpct"),
+    gstAmt: num("q-gstamt", { int: true }),
+    total: num("q-total", { int: true }),
+    min: num("q-min", { int: true }),
+    advPct: num("q-advpct"),
+    advAmt: num("q-advamt", { int: true }),
+  };
+  if (Object.values(values).some((v) => v === null)) return null;
+  const { subtotal, gstPct, gstAmt, total, min, advPct, advAmt } = values;
+  const hasAdvance = advPct !== undefined || advAmt !== undefined;
+  return {
+    ...put("subtotalINR", subtotal),
+    gst: { status: gstStatus, ...put("ratePct", gstPct), ...put("amountINR", gstAmt) },
+    ...put("totalINR", total),
+    ...(min !== undefined && min > 0 ? { minimumGuarantee: { quantity: min } } : {}),
+    ...(hasAdvance ? { advance: { ...put("percent", advPct), ...put("amountINR", advAmt) } } : {}),
+    refundMentioned,
+  };
+}
+
 /** The editable table. Nothing is checked until the user confirms these numbers. */
 export function renderConfirm(draft, fromAi) {
   const box = $("quote-confirm");
@@ -211,67 +272,24 @@ export function renderConfirm(draft, fromAi) {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     msg.textContent = "";
-    const lines = [];
-    for (const tr of rows.querySelectorAll("tr")) {
-      const get = (k) => /** @type {HTMLInputElement} */ (tr.querySelector(`[data-f="${k}"]`)).value;
-      const description = get("description").trim();
-      const q = parseNum(get("quantity")),
-        r = parseNum(get("rate")),
-        a = parseNum(get("amountINR"), { int: true });
-      if (!description && q === undefined && r === undefined && a === undefined) continue;
-      if (!description) {
-        msg.textContent = "Every line needs an item name.";
-        return;
-      }
-      if (q === null || r === null || a === null) {
-        msg.textContent = `Check the numbers on "${description}".`;
-        return;
-      }
-      lines.push({
-        description,
-        ...(q !== undefined ? { quantity: q } : {}),
-        ...(get("unit").trim() ? { unit: get("unit").trim() } : {}),
-        ...(r !== undefined ? { rate: r } : {}),
-        ...(a !== undefined ? { amountINR: Math.round(a) } : {}),
-      });
-    }
-    if (!lines.length) {
-      msg.textContent = "Add at least one line.";
+    const read = readLines(rows);
+    if ("error" in read) {
+      msg.textContent = read.error;
       return;
     }
-    const val = (id, opt) => {
-      const v = parseNum(field(id).value, opt);
-      if (v === null) throw new Error(id);
-      return v;
-    };
-    let quote;
-    try {
-      const min = val("q-min", { int: true });
-      const advPct = val("q-advpct"),
-        advAmt = val("q-advamt", { int: true });
-      quote = {
-        category: quoteDraft.category || field("quote-category").value,
-        ...(field("q-vendor").value.trim() ? { vendorName: field("q-vendor").value.trim() } : {}),
-        lines,
-        ...(val("q-subtotal", { int: true }) !== undefined ? { subtotalINR: val("q-subtotal", { int: true }) } : {}),
-        gst: {
-          status: gstSel.value,
-          ...(val("q-gstpct") !== undefined ? { ratePct: val("q-gstpct") } : {}),
-          ...(val("q-gstamt", { int: true }) !== undefined ? { amountINR: val("q-gstamt", { int: true }) } : {}),
-        },
-        ...(val("q-total", { int: true }) !== undefined ? { totalINR: val("q-total", { int: true }) } : {}),
-        ...(min !== undefined && min > 0 ? { minimumGuarantee: { quantity: min } } : {}),
-        ...(advPct !== undefined || advAmt !== undefined
-          ? { advance: { ...(advPct !== undefined ? { percent: advPct } : {}), ...(advAmt !== undefined ? { amountINR: advAmt } : {}) } }
-          : {}),
-        refundMentioned: refund.checked,
-        ...(draft.notes?.length ? { notes: draft.notes.slice(0, 20) } : {}),
-      };
-    } catch {
+    const terms = readTerms(gstSel.value, refund.checked);
+    if (!terms) {
       msg.textContent = "One of the amounts isn't a number. Please check the fields below the table.";
       return;
     }
-    await runQuoteCheck(quote);
+    const vendorName = field("q-vendor").value.trim();
+    await runQuoteCheck({
+      category: quoteDraft.category || field("quote-category").value,
+      ...(vendorName ? { vendorName } : {}),
+      lines: read.lines,
+      ...terms,
+      ...(draft.notes?.length ? { notes: draft.notes.slice(0, 20) } : {}),
+    });
   });
 
   box.replaceChildren(form);

@@ -71,9 +71,8 @@ export function playReady() {
   }, 4500);
 }
 
-export function renderPlan() {
-  const p = state.plan;
-  if (!p) return;
+/** Title, date and the one-line summary under it. */
+function renderHeader(p) {
   const k = p.input;
   const typeLabel = k.eventType === "wedding" ? `${subTypeLabel(k)} wedding` : subTypeLabel(k);
   $("plan-eyebrow").textContent = LABELS.eventType[k.eventType];
@@ -87,14 +86,11 @@ export function renderPlan() {
   ]
     .filter(Boolean)
     .join(" · ");
+}
 
-  const warnings = $("warnings");
-  warnings.replaceChildren(...p.warnings.map((w) => el("p", { class: "warning" }, w.message)));
-
-  // Budget (re-balanced from any bookings the user recorded)
+/** The six summary tiles once anything is booked: budget, booked, paid, due, still to book, buffer. */
+function renderSpendSummary(p) {
   const sp = p.spending;
-  const subParts = [`${inr(p.budget.perGuestINR)} per guest`, `food ${inr(p.budget.foodPerGuestINR)} per guest`];
-  $("budget-sub").textContent = subParts.join(" · ");
   const summary = $("spend-summary");
   summary.replaceChildren();
   summary.hidden = !sp.bookedCount;
@@ -133,113 +129,133 @@ export function renderPlan() {
         : tile("Buffer left", inr(sp.contingencyNowINR), `planned ${inr(sp.contingencyPlannedINR)}`),
     );
   }
+}
+
+/** One budget line: amount, share bar, booking notes and the cost button. */
+function budgetRow(l, sp, bpByKey, maxBp) {
+  const bar = el("span", { class: "bar", "aria-hidden": "true" });
+  bar.style.width = `${Math.max(3, (bpByKey[l.key] / maxBp) * 100)}%`; // biggest line fills the cell
+  const isBuffer = l.key === "contingency";
+  let note = null;
+  if (l.booked) {
+    const diff = l.differenceINR;
+    note = el(
+      "span",
+      { class: "line-note" },
+      el("span", null, `Planned ${inr(l.plannedINR)}${diff ? ` · ${diff > 0 ? `over by ${inr(diff)}` : `saved ${inr(-diff)}`}` : ""}`),
+      el("span", null, `Advance ${inr(l.advanceINR)} · due ${inr(l.dueINR)}`),
+    );
+  } else if (isBuffer && sp.bookedCount && sp.contingencyNowINR !== l.plannedINR) {
+    note = el("span", { class: "line-note" }, `Planned ${inr(l.plannedINR)} · adjusted for your bookings`);
+  }
+  const amount = l.booked ? l.agreedINR : isBuffer ? sp.contingencyNowINR : l.plannedINR;
+  const hasCost = l.booked; // from a timeline booking and/or a recorded cost
+  const costBtn = isBuffer
+    ? null
+    : el(
+        "button",
+        {
+          type: "button",
+          class: "link-btn",
+          "aria-label": `${hasCost ? "Edit" : "Record"} cost for ${l.label}`,
+          onclick: (e) => openLineCost(e.currentTarget.closest("tr"), l),
+        },
+        hasCost ? "Edit cost" : "Record cost",
+      );
+  return el(
+    "tr",
+    { class: l.booked ? "booked" : "" },
+    el(
+      "th",
+      { scope: "row" },
+      l.label,
+      l.booked ? el("span", { class: "badge booked" }, l.agreedINR === 0 ? "not needed" : "booked") : null,
+      note,
+      bar,
+      costBtn,
+    ),
+    el("td", { class: "num" }, inr(amount)),
+    el("td", { class: "num share" }, pct(bpByKey[l.key])),
+  );
+}
+
+/** The budget table, re-balanced from any bookings the user recorded. */
+function renderBudget(p) {
+  const sp = p.spending;
+  const subParts = [`${inr(p.budget.perGuestINR)} per guest`, `food ${inr(p.budget.foodPerGuestINR)} per guest`];
+  $("budget-sub").textContent = subParts.join(" · ");
+  renderSpendSummary(p);
   const bpByKey = Object.fromEntries(p.budget.lines.map((l) => [l.key, l.bp]));
   const maxBp = Math.max(...p.budget.lines.map((l) => l.bp));
-  $("budget-rows").replaceChildren(
-    ...sp.lines.map((l) => {
-      const bar = el("span", { class: "bar", "aria-hidden": "true" });
-      bar.style.width = `${Math.max(3, (bpByKey[l.key] / maxBp) * 100)}%`; // biggest line fills the cell
-      const isBuffer = l.key === "contingency";
-      let note = null;
-      if (l.booked) {
-        const diff = l.differenceINR;
-        note = el(
-          "span",
-          { class: "line-note" },
-          el("span", null, `Planned ${inr(l.plannedINR)}${diff ? ` · ${diff > 0 ? `over by ${inr(diff)}` : `saved ${inr(-diff)}`}` : ""}`),
-          el("span", null, `Advance ${inr(l.advanceINR)} · due ${inr(l.dueINR)}`),
-        );
-      } else if (isBuffer && sp.bookedCount && sp.contingencyNowINR !== l.plannedINR) {
-        note = el("span", { class: "line-note" }, `Planned ${inr(l.plannedINR)} · adjusted for your bookings`);
-      }
-      const amount = l.booked ? l.agreedINR : isBuffer ? sp.contingencyNowINR : l.plannedINR;
-      const hasCost = l.booked; // from a timeline booking and/or a recorded cost
-      const costBtn = isBuffer
-        ? null
-        : el(
-            "button",
-            {
-              type: "button",
-              class: "link-btn",
-              "aria-label": `${hasCost ? "Edit" : "Record"} cost for ${l.label}`,
-              onclick: (e) => openLineCost(e.currentTarget.closest("tr"), l),
-            },
-            hasCost ? "Edit cost" : "Record cost",
-          );
-      return el(
-        "tr",
-        { class: l.booked ? "booked" : "" },
-        el(
-          "th",
-          { scope: "row" },
-          l.label,
-          l.booked ? el("span", { class: "badge booked" }, l.agreedINR === 0 ? "not needed" : "booked") : null,
-          note,
-          bar,
-          costBtn,
-        ),
-        el("td", { class: "num" }, inr(amount)),
-        el("td", { class: "num share" }, pct(bpByKey[l.key])),
-      );
-    }),
-  );
+  $("budget-rows").replaceChildren(...sp.lines.map((l) => budgetRow(l, sp, bpByKey, maxBp)));
   // Total = what the lines above add up to. When bookings push past the budget, say both.
   const projected = sp.projectedSpendINR;
   $("budget-total").replaceChildren(
     inr(projected),
     sp.overBudgetINR ? el("span", { class: "line-note over-note" }, `Budget ${inr(p.budget.totalINR)}`) : "",
   );
+}
 
-  // Timeline
+/** One timeline task. Ticking a booking task asks for the price first; unticking removes its booking. */
+function taskItem(t, lineLabel) {
+  const id = `task-${t.id}`;
+  const done = !!state.done[t.id];
+  const deal = state.deals[t.id];
+  const box = el("input", { type: "checkbox", id });
+  box.checked = done;
+  const li = el("li", { class: `task${done ? " done" : ""}` });
+  box.addEventListener("change", () => {
+    if (box.checked && t.books && !deal) {
+      box.checked = false; // stays unticked until the booking is saved or skipped
+      openBooking(li, t, lineLabel[t.books]);
+      return;
+    }
+    state.done[t.id] = box.checked;
+    if (!box.checked && deal) {
+      delete state.deals[t.id];
+      save();
+      refreshPlan();
+      return;
+    }
+    save();
+    refreshPlan();
+  });
+  const when = t.status === "late" ? `Ideally by ${fmtDate(t.idealDate)} · do it now` : `By ${fmtDate(t.dueDate)}`;
+  li.append(
+    box,
+    el(
+      "label",
+      { for: id },
+      t.title,
+      !done && t.status !== "upcoming" ? el("span", { class: `badge ${t.status}` }, t.status === "late" ? "late" : "this week") : null,
+      el(
+        "span",
+        { class: "when" },
+        deal ? (deal.agreedINR === 0 ? "Not needed" : `Booked for ${inr(deal.agreedINR)} · advance ${inr(deal.advanceINR)}`) : when,
+      ),
+    ),
+  );
+  return li;
+}
+
+function renderTimeline(p) {
   const doneCount = p.timeline.tasks.filter((t) => state.done[t.id]).length;
   $("timeline-sub").textContent =
     `${doneCount} of ${p.timeline.tasks.length} done${p.timeline.lateCount ? ` · ${p.timeline.lateCount} behind schedule` : ""}`;
   const lineLabel = Object.fromEntries(p.budget.lines.map((l) => [l.key, l]));
-  $("tasks").replaceChildren(
-    ...p.timeline.tasks.map((t) => {
-      const id = `task-${t.id}`;
-      const done = !!state.done[t.id];
-      const deal = state.deals[t.id];
-      const box = el("input", { type: "checkbox", id });
-      box.checked = done;
-      const li = el("li", { class: `task${done ? " done" : ""}` });
-      box.addEventListener("change", () => {
-        if (box.checked && t.books && !deal) {
-          box.checked = false; // stays unticked until the booking is saved or skipped
-          openBooking(li, t, lineLabel[t.books]);
-          return;
-        }
-        state.done[t.id] = box.checked;
-        if (!box.checked && deal) {
-          delete state.deals[t.id];
-          save();
-          refreshPlan();
-          return;
-        }
-        save();
-        refreshPlan();
-      });
-      const when = t.status === "late" ? `Ideally by ${fmtDate(t.idealDate)} · do it now` : `By ${fmtDate(t.dueDate)}`;
-      li.append(
-        box,
-        el(
-          "label",
-          { for: id },
-          t.title,
-          !done && t.status !== "upcoming" ? el("span", { class: `badge ${t.status}` }, t.status === "late" ? "late" : "this week") : null,
-          el(
-            "span",
-            { class: "when" },
-            deal ? (deal.agreedINR === 0 ? "Not needed" : `Booked for ${inr(deal.agreedINR)} · advance ${inr(deal.advanceINR)}`) : when,
-          ),
-        ),
-      );
-      return li;
-    }),
-  );
+  $("tasks").replaceChildren(...p.timeline.tasks.map((t) => taskItem(t, lineLabel)));
+}
 
+/** Draws the whole plan screen from the plan the server calculated. */
+export function renderPlan() {
+  const p = state.plan;
+  if (!p) return;
+  renderHeader(p);
+  const warnings = $("warnings");
+  warnings.replaceChildren(...p.warnings.map((w) => el("p", { class: "warning" }, w.message)));
+  renderBudget(p);
+  renderTimeline(p);
   renderVendors();
-
   renderIdeas();
   renderQuoteStart();
   updateInstall();
