@@ -8,8 +8,9 @@ import { z } from "zod";
  * Nothing is cached or logged.
  */
 
-export { SEARCH_TERMS } from "../engine/vendors.js";
-import { SEARCH_TERMS } from "../engine/vendors.js";
+import { SEARCH_TERMS } from "../engine/data/vendor-checklists.js";
+
+export { SEARCH_TERMS };
 
 export const FindVendorsSchema = z
   .strictObject({

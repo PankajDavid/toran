@@ -29,6 +29,7 @@ There is no database and no login. The plan lives in the browser (`localStorage`
 | Folder | What it does | AI? |
 |---|---|---|
 | `engine/` | Budget split (largest-remainder rounding, so lines add up to the rupee), timeline (dated back from the event, compressed when late), vendor checklist, bookings and re-balancing, Toran suggests, quote checks, calendar file | No |
+| `engine/data/` | Reference tables kept apart from the logic: vendor categories and questions, planning tasks with lead times, the wording the Quote Checker looks for. Budget shares and limits are in `engine/config.ts` | No |
 | `interview/` | Local parser for English/Hinglish (dates, guests, lakh/crore, cities, diet), the question flow, validation of every field | Only for gaps |
 | `ai/` | One injectable `AiClient` for Gemini (structured JSON output), the quote reader, ideas. Every reply is re-validated with zod | Yes |
 | `places/` | Google Places client; query built by code from a fixed term and a validated city; results filtered | No (Google Maps) |

@@ -91,6 +91,7 @@ public/js/         Browser ES modules, one job each (none over 300 lines), type-
                    interview, plan, nav, costs, booking, vendors, vendor-find, vendor-contact,
                    quote, quote-read, quote-verdict, ideas, share, files, suggest, install, store, dom, format, main
 src/engine/        Deterministic planner: budget, timeline, vendors, deals, quote checks, suggestions, calendar
+src/engine/data/   Reference tables (vendor questions, planning tasks, quote wording), apart from the logic
 src/interview/     Local Hinglish parser + interview flow (AI only for gaps)
 src/ai/            Gemini client (injectable), ideas, quote reader
 src/places/        Google Places client with result validation
