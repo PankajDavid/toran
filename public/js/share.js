@@ -7,7 +7,8 @@ import { fmtDate, inr, subTypeLabel } from "./format.js";
 import { api, fresh, replaceState, save, state } from "./store.js";
 import { renderKnown } from "./interview.js";
 import { renderPlan } from "./plan.js";
-import { cleanPhone, MAX_VENDORS, VRANK } from "./vendors.js";
+import { cleanPhone } from "./vendor-contact.js";
+import { MAX_VENDORS, VRANK } from "./vendors.js";
 
 /* ---------- sharing ---------- */
 export const whatsappUrl = (text) => `https://wa.me/?text=${encodeURIComponent(text)}`;

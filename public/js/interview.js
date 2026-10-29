@@ -199,7 +199,7 @@ $("composer").addEventListener("submit", (e) => {
 
 /* ---------- voice input (browser speech recognition) ---------- */
 // Speech recognition is still vendor-prefixed in Chrome and isn't in the standard DOM types.
-const speechWindow = /** @type {Window & { SpeechRecognition?: any; webkitSpeechRecognition?: any }} */ (window);
+export const speechWindow = /** @type {Window & { SpeechRecognition?: any; webkitSpeechRecognition?: any }} */ (window);
 export const Speech = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
 if (Speech) {
   const mic = $("mic");

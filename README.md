@@ -76,8 +76,9 @@ Keyboard-operable throughout (sections menu is an ARIA tablist with arrow keys),
 
 ```
 public/            Plain HTML and CSS, PWA files (no framework, no build step)
-public/js/         Browser ES modules, one per feature: interview, plan, nav, vendors,
-                   quote, ideas, share, files (backup, calendar), suggest, install, store, main
+public/js/         Browser ES modules, one job each (none over 300 lines), type-checked with checkJs:
+                   interview, plan, nav, costs, booking, vendors, vendor-find, vendor-contact,
+                   quote, quote-read, quote-verdict, ideas, share, files, suggest, install, store, dom, format, main
 src/engine/        Deterministic planner: budget, timeline, vendors, deals, quote checks, suggestions, calendar
 src/interview/     Local Hinglish parser + interview flow (AI only for gaps)
 src/ai/            Gemini client (injectable), ideas, quote reader

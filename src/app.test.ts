@@ -183,3 +183,15 @@ describe("static files", () => {
     await new Promise<void>((r) => s.close(() => r()));
   });
 });
+
+describe("offline cache list (service worker)", () => {
+  it("lists every browser module once, and every listed file exists", async () => {
+    const { readFile, readdir, access } = await import("node:fs/promises");
+    const sw = await readFile("public/sw.js", "utf8");
+    const list = [...(sw.match(/const SHELL = \[([\s\S]*?)\];/)?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    expect(new Set(list).size).toBe(list.length); // duplicates make the cache install fail
+    const modules = (await readdir("public/js")).filter((f) => f.endsWith(".js")).map((f) => `/js/${f}`);
+    for (const m of modules) expect(list).toContain(m);
+    for (const f of list.filter((x) => x !== "/")) await access(`public${f}`);
+  });
+});

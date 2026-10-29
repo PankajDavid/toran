@@ -1,3 +1,8 @@
+/*
+ * Toran front end · Formatting and labels shown to the user.
+ * Every piece of text is inserted with textContent (never innerHTML).
+ */
+
 /* ---------- formatting ---------- */
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 export const MONTHS_LONG = [

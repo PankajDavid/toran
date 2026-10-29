@@ -2,11 +2,12 @@
  * Toran front end · "Toran suggests": next actions the user approves.
  * Every piece of text is inserted with textContent (never innerHTML).
  */
+import { vendorIntro, waNumber } from "./vendor-contact.js";
 import { $, el } from "./dom.js";
 import { save, state } from "./store.js";
 import { refreshPlan } from "./plan.js";
 import { showSection } from "./nav.js";
-import { openVendorCats, renderVendors, vendorIntro, waNumber } from "./vendors.js";
+import { openVendorCats, renderVendors } from "./vendors.js";
 import { backupPlan, backupSignature, calendarSignature, downloadCalendar } from "./files.js";
 
 /* ---------- Toran suggests: approve before anything happens ---------- */
