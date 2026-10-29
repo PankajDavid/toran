@@ -53,34 +53,34 @@ function resolveDate(day: number, month: number, year: number | undefined, today
   return undefined;
 }
 
+/** Exact dates people write, tried in order. Each returns [day, month, year?] from its match. */
+const DATE_PATTERNS: { re: RegExp; parts: (m: RegExpMatchArray) => [number, number | undefined, number | undefined] }[] = [
+  // Indian order: day/month/year. The year is required, so "1.5 lakh" or a range like
+  // "10-12 lakh" can never be read as a date.
+  { re: /\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})\b/, parts: (m) => [Number(m[1]), Number(m[2]), Number(m[3])] },
+  {
+    re: new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s*(?:of\\s+)?(${MONTH_ALT})\\b(?:\\s*,?\\s*(\\d{4}))?`),
+    parts: (m) => [Number(m[1]), monthOf(m[2]), m[3] ? Number(m[3]) : undefined],
+  },
+  {
+    re: new RegExp(`\\b(${MONTH_ALT})\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?:\\s*,?\\s*(\\d{4}))?`),
+    parts: (m) => [Number(m[2]), monthOf(m[1]), m[3] ? Number(m[3]) : undefined],
+  },
+];
+
 function parseDate(t: string, today: string): { eventDate?: string; eventMonth?: number } {
-  let m = t.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-  if (m && isValidIsoDate(m[0])) return { eventDate: m[0] };
-
-  // Indian order: day/month/year. The year is required, so "1.5 lakh" or a range
-  // like "10-12 lakh" can never be read as a date.
-  m = t.match(/\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})\b/);
-  if (m) {
-    const d = resolveDate(Number(m[1]), Number(m[2]), Number(m[3]), today);
+  const iso = t.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (iso && isValidIsoDate(iso[0])) return { eventDate: iso[0] };
+  for (const { re, parts } of DATE_PATTERNS) {
+    const m = t.match(re);
+    if (!m) continue;
+    const [day, month, year] = parts(m);
+    const d = month ? resolveDate(day, month, year, today) : undefined;
     if (d) return { eventDate: d };
   }
-
-  m = t.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s*(?:of\\s+)?(${MONTH_ALT})\\b(?:\\s*,?\\s*(\\d{4}))?`));
-  const month1 = m ? monthOf(m[2]) : undefined;
-  if (m && month1) {
-    const d = resolveDate(Number(m[1]), month1, m[3] ? Number(m[3]) : undefined, today);
-    if (d) return { eventDate: d };
-  }
-  m = t.match(new RegExp(`\\b(${MONTH_ALT})\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?:\\s*,?\\s*(\\d{4}))?`));
-  const month2 = m ? monthOf(m[1]) : undefined;
-  if (m && month2) {
-    const d = resolveDate(Number(m[2]), month2, m[3] ? Number(m[3]) : undefined, today);
-    if (d) return { eventDate: d };
-  }
-
   if (/\b(kal|tomorrow)\b/.test(t)) return { eventDate: fromDayNumber(toDayNumber(today) + 1) };
 
-  m = t.match(new RegExp(`\\b(${MONTH_ALT})\\b`));
+  const m = t.match(new RegExp(`\\b(${MONTH_ALT})\\b`));
   // "may" is also an English word; only accept it as a month next to a date-ish cue.
   if (m && !(m[1] === "may" && !/\b(may|mai)\s+(mein|me|month|\d{4})\b/.test(t))) {
     return { eventMonth: monthOf(m[1]) };

@@ -131,6 +131,35 @@ export async function importFromLink() {
   return openPayload(payload, "This plan link is damaged or out of date, so it couldn't be opened.");
 }
 
+/**
+ * One tracked vendor from a link or backup row: [category, name, phone, status, amount, booking ref, advance].
+ * Anything malformed is dropped; a booking ref is kept only if that booking really exists.
+ */
+function vendorFromRow(row, i, catKeys, deals, lineCosts) {
+  if (!Array.isArray(row)) return null;
+  const [cat, name, phone, status, amount, ref, adv] = row;
+  if (!catKeys.has(cat) || typeof name !== "string" || !name.trim() || !(status in VRANK)) return null;
+  const v = {
+    id: `v${Date.now().toString(36)}${i}`,
+    cat,
+    name: name.trim().slice(0, 60),
+    phone: (typeof phone === "string" && cleanPhone(phone)) || "",
+    status,
+  };
+  const confirmed = status === "confirmed";
+  if (Number.isInteger(amount) && amount > 0) v[confirmed ? "agreedINR" : "quoteINR"] = amount;
+  if (confirmed && typeof ref === "string") v.booking = bookingFromRef(ref, deals, lineCosts);
+  if (!v.booking) delete v.booking;
+  else if (Number.isInteger(adv) && adv > 0) v.advanceINR = adv;
+  return v;
+}
+
+/** "=catering" points at a line cost, anything else at a timeline task; only if that booking exists. */
+function bookingFromRef(ref, deals, lineCosts) {
+  if (ref.startsWith("=")) return lineCosts[ref.slice(1)] ? { lineKey: ref.slice(1) } : undefined;
+  return deals[ref] ? { taskId: ref } : undefined;
+}
+
 /** Rebuilds a plan from a link or backup file. The server re-validates everything. */
 export async function openPayload(payload, failMessage, extra = {}) {
   const pick = (obj) => {
@@ -157,23 +186,10 @@ export async function openPayload(payload, failMessage, extra = {}) {
       ],
     });
     const catKeys = new Set(plan.vendors.map((v) => v.key));
-    const vendorList = (Array.isArray(payload.vn) ? payload.vn : []).slice(0, MAX_VENDORS).flatMap((row, i) => {
-      if (!Array.isArray(row)) return [];
-      const [cat, name, phone, status, amount, ref, adv] = row;
-      if (!catKeys.has(cat) || typeof name !== "string" || !name.trim() || !(status in VRANK)) return [];
-      const ph = typeof phone === "string" ? cleanPhone(phone) : "";
-      const v = { id: `v${Date.now().toString(36)}${i}`, cat, name: name.trim().slice(0, 60), phone: ph || "", status };
-      if (Number.isInteger(amount) && amount > 0) {
-        if (status === "confirmed") v.agreedINR = amount;
-        else v.quoteINR = amount;
-      }
-      if (status === "confirmed" && typeof ref === "string") {
-        if (ref.startsWith("=") && lineCosts[ref.slice(1)]) v.booking = { lineKey: ref.slice(1) };
-        else if (deals[ref]) v.booking = { taskId: ref };
-        if (v.booking && Number.isInteger(adv) && adv > 0) v.advanceINR = adv;
-      }
-      return [v];
-    });
+    const vendorList = (Array.isArray(payload.vn) ? payload.vn : [])
+      .slice(0, MAX_VENDORS)
+      .map((row, i) => vendorFromRow(row, i, catKeys, deals, lineCosts))
+      .filter(Boolean);
     replaceState({
       ...fresh(),
       known: { ...payload.i },

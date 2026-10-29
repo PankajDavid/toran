@@ -60,22 +60,30 @@ const fieldSchemas = {
  * for weddings, date not in the past and within the allowed window.
  */
 export function sanitizeKnown(raw: unknown, today: string): Known {
+  return applyCrossFieldRules(pickValidFields(raw), today);
+}
+
+/** Each known field that passes its own schema. Own properties only: never values from an object's prototype. */
+function pickValidFields(raw: unknown): Known {
   const out: Record<string, unknown> = {};
-  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    for (const field of KNOWN_FIELDS) {
-      // Own properties only: never read values smuggled in through an object's prototype.
-      if (!Object.hasOwn(raw, field)) continue;
-      const value = (raw as Record<string, unknown>)[field];
-      if (value === undefined || value === null) continue;
-      const parsed = fieldSchemas[field].safeParse(value);
-      if (parsed.success) out[field] = parsed.data;
-    }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out as Known;
+  for (const field of KNOWN_FIELDS) {
+    if (!Object.hasOwn(raw, field)) continue;
+    const value = (raw as Record<string, unknown>)[field];
+    if (value === undefined || value === null) continue;
+    const parsed = fieldSchemas[field].safeParse(value);
+    if (parsed.success) out[field] = parsed.data;
   }
-  const k = out as Known;
+  return out as Known;
+}
+
+/** Rules that span fields: sub-type fits the event type, functions only for weddings, a date in the allowed window. */
+function applyCrossFieldRules(k: Known, today: string): Known {
   if (k.subType && (!k.eventType || !SUB_TYPES[k.eventType].includes(k.subType))) delete k.subType;
   if (k.subEvents && k.eventType !== "wedding") delete k.subEvents;
   if (k.subEvents) k.subEvents = [...new Set(k.subEvents)];
-  if (k.eventDate && (k.eventDate < today || k.eventDate > addYears(today, LIMITS.maxYearsAhead))) delete k.eventDate;
+  const outOfWindow = k.eventDate && (k.eventDate < today || k.eventDate > addYears(today, LIMITS.maxYearsAhead));
+  if (outOfWindow) delete k.eventDate;
   if (k.eventDate) delete k.eventMonth;
   return k;
 }

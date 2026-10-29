@@ -20,6 +20,27 @@ export function parseRupees(text) {
 }
 
 /**
+ * One cost entry from the editor. An empty "other costs" entry means remove it; an empty
+ * timeline booking must be unticked in the timeline instead.
+ * @returns {{ value: { agreedINR: number; advanceINR: number } | null } | { error: string; focus: HTMLElement }}
+ */
+function readCostEntry(f) {
+  const aText = f.agreed.value.trim();
+  const pText = f.advance.value.trim();
+  if (!aText && f.kind === "task") {
+    const task = f.label.replace("From the timeline: ", "");
+    return { error: `Enter the agreed price for "${task}", or untick that task in the timeline to remove it.`, focus: f.agreed };
+  }
+  if (!aText) return { value: null };
+  const agreed = parseRupees(aText);
+  const advance = pText ? parseRupees(pText) : 0;
+  if (agreed === null) return { error: "Enter amounts in rupees, like 60,000 or 1.5 lakh.", focus: f.agreed };
+  if (advance === null) return { error: "Enter what's paid in rupees, or leave it empty.", focus: f.advance };
+  if (advance > agreed) return { error: "What's paid can't be more than the amount.", focus: f.advance };
+  return { value: { agreedINR: agreed, advanceINR: advance } };
+}
+
+/**
  * Inline form under a budget line. It shows EVERY cost already recorded on this
  * line, each editable in place, so editing never adds a second copy:
  *  - one row per timeline booking that books this line, and
@@ -109,35 +130,13 @@ export function openLineCost(tr, line) {
     e.preventDefault();
     const updates = [];
     for (const f of entries) {
-      const aText = f.agreed.value.trim();
-      const pText = f.advance.value.trim();
-      if (!aText) {
-        if (f.kind === "task") {
-          msg.textContent = `Enter the agreed price for "${f.label.replace("From the timeline: ", "")}", or untick that task in the timeline to remove it.`;
-          f.agreed.focus();
-          return;
-        }
-        updates.push({ f, value: null }); // empty "other costs" = remove it
-        continue;
-      }
-      const a = parseRupees(aText);
-      const adv = pText ? parseRupees(pText) : 0;
-      if (a === null) {
-        msg.textContent = "Enter amounts in rupees, like 60,000 or 1.5 lakh.";
-        f.agreed.focus();
+      const read = readCostEntry(f);
+      if ("error" in read) {
+        msg.textContent = read.error;
+        read.focus.focus();
         return;
       }
-      if (adv === null) {
-        msg.textContent = "Enter what's paid in rupees, or leave it empty.";
-        f.advance.focus();
-        return;
-      }
-      if (adv > a) {
-        msg.textContent = "What's paid can't be more than the amount.";
-        f.advance.focus();
-        return;
-      }
-      updates.push({ f, value: { agreedINR: a, advanceINR: adv } });
+      updates.push({ f, value: read.value });
     }
     for (const { f, value } of updates) {
       if (f.kind === "task") state.deals[f.id] = value;

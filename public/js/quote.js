@@ -46,95 +46,88 @@ export function renderQuoteStart() {
   renderSavedQuotes();
 }
 
+const issues = (q) => (q.problems ? `${q.problems} mistake${q.problems === 1 ? "" : "s"}` : q.warnings ? `${q.warnings} to ask` : "clean");
+
+/** One saved quote in the comparison table, with Open and Remove. */
+function savedQuoteRow(q, lowest) {
+  const open = () => {
+    quoteDraft.category = q.category;
+    runQuoteCheck(q.quote);
+  };
+  const remove = () => {
+    state.quotes = state.quotes.filter((x) => x.id !== q.id);
+    save();
+    renderSavedQuotes();
+  };
+  return el(
+    "tr",
+    { class: q.booked ? "booked" : "" },
+    el(
+      "th",
+      { scope: "row" },
+      q.vendorName,
+      lowest ? el("span", { class: "badge good" }, "lowest") : null,
+      q.booked ? el("span", { class: "badge booked" }, "booked") : null,
+    ),
+    el("td", { class: "num" }, inr(q.trueTotalINR)),
+    el("td", null, issues(q)),
+    el(
+      "td",
+      null,
+      el("button", { type: "button", class: "link-btn", onclick: open }, "Open"),
+      el("button", { type: "button", class: "link-btn", "aria-label": `Remove ${q.vendorName}`, onclick: remove }, "Remove"),
+    ),
+  );
+}
+
+/** Saved quotes per category, cheapest true total first, to compare like for like. */
+function comparisonTable(cat, qs) {
+  const line = lineByKey(cat);
+  const sorted = [...qs].sort((a, b) => a.trueTotalINR - b.trueTotalINR);
+  return el(
+    "div",
+    { class: "table-scroll" },
+    el(
+      "table",
+      { class: "compare" },
+      el("caption", null, line ? `${line.label} · planned ${inr(line.plannedINR)}` : cat),
+      el(
+        "thead",
+        null,
+        el(
+          "tr",
+          null,
+          ["Vendor", "True total", "Issues", ""].map((h) => el("th", { scope: "col" }, h)),
+        ),
+      ),
+      el(
+        "tbody",
+        null,
+        sorted.map((q, i) => savedQuoteRow(q, i === 0 && sorted.length > 1)),
+      ),
+    ),
+  );
+}
+
 export function renderSavedQuotes() {
   const box = $("quote-saved");
   const list = state.quotes || [];
   box.replaceChildren();
   if (state.plan) renderNav();
   if (!list.length) return;
-  const byCat = {};
-  for (const q of list) {
-    if (!byCat[q.category]) byCat[q.category] = [];
-    byCat[q.category].push(q);
+  const byCat = groupBy(list, (q) => q.category);
+  box.append(el("h3", { class: "saved-title" }, "Saved quotes"), ...Object.entries(byCat).map(([cat, qs]) => comparisonTable(cat, qs)));
+}
+
+/** Groups a list into { key: items[] }. */
+function groupBy(list, key) {
+  const out = {};
+  for (const x of list) {
+    const k = key(x);
+    if (!out[k]) out[k] = [];
+    out[k].push(x);
   }
-  box.append(el("h3", { class: "saved-title" }, "Saved quotes"));
-  for (const [cat, qs] of Object.entries(byCat)) {
-    const line = lineByKey(cat);
-    const sorted = [...qs].sort((a, b) => a.trueTotalINR - b.trueTotalINR);
-    box.append(
-      el(
-        "div",
-        { class: "table-scroll" },
-        el(
-          "table",
-          { class: "compare" },
-          el("caption", null, `${line ? line.label : cat}${line ? ` · planned ${inr(line.plannedINR)}` : ""}`),
-          el(
-            "thead",
-            null,
-            el(
-              "tr",
-              null,
-              ["Vendor", "True total", "Issues", ""].map((h) => el("th", { scope: "col" }, h)),
-            ),
-          ),
-          el(
-            "tbody",
-            null,
-            sorted.map((q, i) =>
-              el(
-                "tr",
-                { class: q.booked ? "booked" : "" },
-                el(
-                  "th",
-                  { scope: "row" },
-                  q.vendorName,
-                  i === 0 && sorted.length > 1 ? el("span", { class: "badge good" }, "lowest") : null,
-                  q.booked ? el("span", { class: "badge booked" }, "booked") : null,
-                ),
-                el("td", { class: "num" }, inr(q.trueTotalINR)),
-                el(
-                  "td",
-                  null,
-                  q.problems ? `${q.problems} mistake${q.problems === 1 ? "" : "s"}` : q.warnings ? `${q.warnings} to ask` : "clean",
-                ),
-                el(
-                  "td",
-                  null,
-                  el(
-                    "button",
-                    {
-                      type: "button",
-                      class: "link-btn",
-                      onclick: () => {
-                        quoteDraft.category = q.category;
-                        runQuoteCheck(q.quote);
-                      },
-                    },
-                    "Open",
-                  ),
-                  el(
-                    "button",
-                    {
-                      type: "button",
-                      class: "link-btn",
-                      "aria-label": `Remove ${q.vendorName}`,
-                      onclick: () => {
-                        state.quotes = state.quotes.filter((x) => x.id !== q.id);
-                        save();
-                        renderSavedQuotes();
-                      },
-                    },
-                    "Remove",
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  return out;
 }
 
 $("quote-file").addEventListener("change", (e) => {

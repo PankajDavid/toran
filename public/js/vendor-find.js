@@ -128,55 +128,7 @@ export function findBox(c) {
         ? el(
             "ul",
             { class: "v-found", "aria-label": `Google Maps results ${res.where}` },
-            res.vendors.map((f) => {
-              const added = mine.has(f.name.trim().toLowerCase());
-              return el(
-                "li",
-                { class: "v-found-item" },
-                el(
-                  "div",
-                  { class: "v-who" },
-                  el("strong", null, f.name),
-                  f.rating !== undefined
-                    ? el(
-                        "span",
-                        { class: "v-note" },
-                        `★ ${f.rating}${f.ratingCount !== undefined ? ` (${f.ratingCount.toLocaleString("en-IN")} reviews)` : ""}`,
-                      )
-                    : null,
-                  f.address ? el("span", { class: "v-phone" }, f.address) : null,
-                ),
-                el(
-                  "div",
-                  { class: "row-actions" },
-                  f.phone ? el("a", { class: "btn-quiet btn-link", href: `tel:${f.phone.replace(/[^\d+]/g, "")}` }, "Call") : null,
-                  el("a", { class: "btn-quiet btn-link", href: f.mapsUrl, target: "_blank", rel: "noopener" }, "Open in Maps"),
-                  el(
-                    "button",
-                    {
-                      type: "button",
-                      class: added ? "btn-quiet" : "btn-primary",
-                      disabled: added,
-                      onclick: () => {
-                        if (!state.vendorList) state.vendorList = [];
-                        const list = state.vendorList;
-                        if (list.length >= MAX_VENDORS) return;
-                        list.push({
-                          id: `v${Date.now().toString(36)}`,
-                          cat: c.key,
-                          name: f.name.slice(0, 60),
-                          phone: (f.phone && cleanPhone(f.phone)) || "",
-                          status: "to-contact",
-                        });
-                        save();
-                        renderVendors();
-                      },
-                    },
-                    added ? "In your list" : "Add to my list",
-                  ),
-                ),
-              );
-            }),
+            res.vendors.map((f) => foundItem(f, c, mine.has(f.name.trim().toLowerCase()))),
           )
         : el(
             "p",
@@ -215,6 +167,48 @@ export function priceLinks(c, city) {
       { class: "v-gsearch" },
       "Or search: ",
       qs.map((q) => el("a", { class: "chip-link", href: g(q, false), target: "_blank", rel: "noopener" }, q)),
+    ),
+  );
+}
+
+/** Adds a Google Maps listing to the tracker as "to contact". */
+function addFound(f, c) {
+  if (!state.vendorList) state.vendorList = [];
+  if (state.vendorList.length >= MAX_VENDORS) return;
+  state.vendorList.push({
+    id: `v${Date.now().toString(36)}`,
+    cat: c.key,
+    name: f.name.slice(0, 60),
+    phone: (f.phone && cleanPhone(f.phone)) || "",
+    status: "to-contact",
+  });
+  save();
+  renderVendors();
+}
+
+/** One Google Maps listing: name, rating, address, and Call / Open in Maps / Add to my list. */
+function foundItem(f, c, added) {
+  const reviews = f.ratingCount !== undefined ? ` (${f.ratingCount.toLocaleString("en-IN")} reviews)` : "";
+  return el(
+    "li",
+    { class: "v-found-item" },
+    el(
+      "div",
+      { class: "v-who" },
+      el("strong", null, f.name),
+      f.rating !== undefined ? el("span", { class: "v-note" }, `★ ${f.rating}${reviews}`) : null,
+      f.address ? el("span", { class: "v-phone" }, f.address) : null,
+    ),
+    el(
+      "div",
+      { class: "row-actions" },
+      f.phone ? el("a", { class: "btn-quiet btn-link", href: `tel:${f.phone.replace(/[^\d+]/g, "")}` }, "Call") : null,
+      el("a", { class: "btn-quiet btn-link", href: f.mapsUrl, target: "_blank", rel: "noopener" }, "Open in Maps"),
+      el(
+        "button",
+        { type: "button", class: added ? "btn-quiet" : "btn-primary", disabled: added, onclick: () => addFound(f, c) },
+        added ? "In your list" : "Add to my list",
+      ),
     ),
   );
 }
