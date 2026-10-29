@@ -57,7 +57,7 @@ We also tried Gemini's Google Search grounding for live market prices. Productio
 ```bash
 npm install
 npm test          # 352 unit and API tests
-npm run test:coverage  # coverage: 98% of lines, 88% of branches; CI fails below 95% / 85%
+npm run test:coverage  # coverage: 99% of lines, 89% of branches; CI fails below 95% / 85%
 npm run typecheck
 npm run lint      # Biome: lint + format check (TypeScript, browser JS, CSS)
 npm run check     # all three, as CI runs on every push
@@ -81,7 +81,7 @@ Keyboard-operable throughout (sections menu is an ARIA tablist with arrow keys),
 
 ## Architecture
 
-Full write-up: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Security design: [SECURITY.md](SECURITY.md).
+Full write-up: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Security design: [SECURITY.md](SECURITY.md). How to contribute: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```
 public/            Plain HTML, PWA files (no framework, no build step)
@@ -111,4 +111,4 @@ The Dockerfile runs on any container host (Railway, Google Cloud Run).
 
 ## Licence
 
-MIT
+[MIT](LICENSE)

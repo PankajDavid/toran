@@ -16,7 +16,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
-  "author": "",
+  "author": "Pankaj David",
   "license": "MIT",
   "dependencies": {
     "@google/genai": "^2.31.0",
@@ -39,5 +39,11 @@
   "type": "module",
   "engines": {
     "node": ">=22"
-  }
+  },
+  "homepage": "https://toran.up.railway.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PankajDavid/toran.git"
+  },
+  "private": true
 }

@@ -10,3 +10,9 @@ coverage/
 # Playwright
 test-results/
 playwright-report/
+
+# Local scratch files
+*.png
+!public/**/*.png
+!docs/**/*.png
+.local-*
