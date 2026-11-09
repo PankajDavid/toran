@@ -189,7 +189,7 @@ function budgetLevel(plan: PlanInput): string {
   return perGuest < 800 ? "modest" : perGuest < 3000 ? "comfortable" : "lavish";
 }
 
-function describe(plan: PlanInput): string {
+function describePlan(plan: PlanInput): string {
   const parts = [
     `Event: ${plan.eventType} (${plan.subType})`,
     plan.eventType === "wedding" ? `Functions: ${plan.subEvents.join(", ")}` : "",
@@ -208,7 +208,7 @@ export async function generateIdeas(
 ): Promise<IdeasResult> {
   if (ai.available) {
     try {
-      const parts: AiPart[] = [{ text: describe(plan) }];
+      const parts: AiPart[] = [{ text: describePlan(plan) }];
       if (plan.city) parts.push(asData("city", plan.city));
       if (extra.theme) parts.push(asData("family_notes", `Preferred theme: ${extra.theme}`));
       if (extra.notes) parts.push(asData("family_notes", extra.notes));
